@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind, MouseButton};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind, MouseButton};
 use ratatui::layout::Rect;
 use crate::app::{App, Screen, ScanPhase, Pane, ConfirmDialog};
 

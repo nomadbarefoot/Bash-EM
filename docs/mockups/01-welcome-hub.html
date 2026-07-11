@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bash-EM mockup â Welcome Hub</title>
+  <style>
+    :root {
+      --bg: #07080d;
+      --panel: #10121a;
+      --border: #2a3144;
+      --focus: #5ce1ff;
+      --guilty: #ff4d6d;
+      --clean: #b8f574;
+      --count: #ffe566;
+      --muted: #7a849c;
+      --text: #e8ecf7;
+      --accent: #ff8c42;
+      --bar-track: #1a1f2e;
+      --font: "JetBrains Mono", "Fira Code", "SF Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a1030 0%, var(--bg) 55%);
+      color: var(--text); font-family: var(--font);
+      display: grid; place-items: center; padding: 2rem;
+    }
+    .frame {
+      width: min(1100px, 100%);
+      background: var(--bg);
+      border: 2px solid var(--border);
+      box-shadow: 0 0 0 1px #000, 0 25px 80px rgba(255, 77, 109, 0.12);
+    }
+    .titlebar {
+      text-align: center; padding: 0.55rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700; letter-spacing: 0.08em;
+    }
+    .titlebar .dash { color: var(--guilty); text-decoration: line-through; }
+    .tabs {
+      display: flex; gap: 0.25rem; padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border); align-items: center;
+    }
+    .tab {
+      padding: 0.25rem 0.7rem; border: 1px solid transparent; color: var(--muted);
+    }
+    .tab.active {
+      color: var(--bg); background: var(--focus); border-color: var(--focus); font-weight: 700;
+    }
+    .path { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 0.5rem; padding: 0.5rem; min-height: 520px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); padding: 0.65rem 0.75rem;
+      position: relative;
+    }
+    .panel.focus { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+    .panel h2 {
+      margin: 0 0 0.55rem; font-size: 0.75rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em;
+    }
+    .brand-hero {
+      font-size: 1.6rem; font-weight: 800; margin-bottom: 0.35rem;
+    }
+    .brand-hero .x { color: var(--guilty); }
+    .tagline { color: var(--accent); margin-bottom: 1rem; font-size: 0.95rem; }
+    .health-label { display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+    .health-label strong { color: var(--guilty); }
+    .meter {
+      height: 1.35rem; background: var(--bar-track); border: 1px solid var(--border);
+      overflow: hidden; margin-bottom: 0.75rem;
+    }
+    .meter > span {
+      display: block; height: 100%; width: 74%;
+      background: repeating-linear-gradient(
+        -45deg,
+        var(--guilty),
+        var(--guilty) 8px,
+        #ff7a90 8px,
+        #ff7a90 16px
+      );
+      animation: slide 1.2s linear infinite;
+    }
+    @keyframes slide { to { background-position: 22px 0; } }
+    .cats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem;
+      margin-bottom: 0.85rem;
+    }
+    .cat {
+      border: 1px solid var(--border); padding: 0.4rem; font-size: 0.8rem;
+    }
+    .cat b { display: block; color: var(--count); font-size: 1.05rem; }
+    .cat span { color: var(--muted); font-size: 0.7rem; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid var(--clean); color: var(--bg); background: var(--clean);
+      padding: 0.4rem 0.75rem; font-family: inherit; font-weight: 700; cursor: default;
+    }
+    .btn.ghost { background: transparent; color: var(--focus); border-color: var(--focus); }
+    .menu a {
+      display: block; padding: 0.35rem 0.4rem; color: var(--text); text-decoration: none;
+      border-left: 3px solid transparent;
+    }
+    .menu a:hover, .menu a.on {
+      background: #181c2a; border-left-color: var(--focus); color: var(--focus);
+    }
+    .tetris {
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+      height: 180px; margin-top: 0.4rem;
+    }
+    .tetris i {
+      background: #151925; border: 1px solid #22283a; display: block;
+    }
+    .tetris i.on { background: var(--accent); border-color: #ffb07a; }
+    .tetris i.cyan { background: var(--focus); border-color: #9aefff; }
+    .tetris i.pink { background: var(--guilty); border-color: #ff9aab; }
+    .flash { color: var(--clean); font-size: 0.85rem; margin-top: 0.5rem; }
+    .footer {
+      grid-column: 1 / -1;
+      border: 1px solid var(--border); padding: 0.4rem 0.65rem;
+      color: var(--muted); font-size: 0.8rem; display: flex; gap: 1rem; flex-wrap: wrap;
+    }
+    .footer kbd {
+      color: var(--text); background: #1b2030; border: 1px solid var(--border);
+      padding: 0 0.3rem;
+    }
+    .note {
+      margin-top: 1rem; color: var(--muted); font-size: 0.8rem; text-align: center;
+      max-width: 1100px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="frame" role="img" aria-label="Bash-EM welcome hub mockup">
+      <div class="titlebar">Bash<span class="dash">-</span>EM &nbsp;·&nbsp; 0.2.0-hub</div>
+      <div class="tabs">
+        <div class="tab active">Welcome</div>
+        <div class="tab">Browse</div>
+        <div class="tab">Scan</div>
+        <div class="tab">Backups</div>
+        <div class="tab">Profiles</div>
+        <div class="path">~/Documents/LM_Projects/essay-farm</div>
+      </div>
+      <div class="grid">
+        <div class="panel focus" style="grid-row: span 2;">
+          <h2>mission control</h2>
+          <div class="brand-hero">Bash<span class="x">-</span>EM</div>
+          <div class="tagline">the em-dashes know. they are not ready.</div>
+
+          <div class="health-label">
+            <span>directory corruption</span>
+            <strong>74% Â· 1,284 artifacts</strong>
+          </div>
+          <div class="meter" title="health / corruption meter"><span></span></div>
+
+          <div class="cats">
+            <div class="cat"><b>402</b><span>text / docs</span></div>
+            <div class="cat"><b>88</b><span>code</span></div>
+            <div class="cat"><b>120</b><span>web assets</span></div>
+            <div class="cat"><b>40</b><span>office</span></div>
+            <div class="cat"><b>19</b><span>xlsx cells</span></div>
+            <div class="cat"><b>7</b><span>pdf (text)</span></div>
+          </div>
+
+          <div class="actions">
+            <button class="btn">â¸ Scan &amp; bash</button>
+            <button class="btn ghost">Browseâ¦</button>
+            <button class="btn ghost">Backups</button>
+          </div>
+          <p class="flash">last run: 3m ago Â· 312 dashes purged Â· restore available</p>
+        </div>
+
+        <div class="panel">
+          <h2>navigate</h2>
+          <div class="menu">
+            <a class="on" href="#">â¸ Welcome / health</a>
+            <a href="#">  Browse directory</a>
+            <a href="#">  Review offenders</a>
+            <a href="#">  Backup vault</a>
+            <a href="#">  Profiles (YAML)</a>
+            <a href="#">  Stats museum</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>add-on Â· tetris <span style="color:var(--count)">score 420</span></h2>
+          <div class="tetris" aria-hidden="true">
+            <!-- decorative mini grid -->
+            <i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i class="cyan"></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i class="cyan"></i><i class="cyan"></i><i class="cyan"></i><i></i>
+            <i></i><i class="pink"></i><i class="pink"></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i class="pink"></i><i class="pink"></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i class="on"></i><i class="on"></i><i class="on"></i><i class="cyan"></i><i class="cyan"></i><i class="pink"></i><i class="pink"></i><i></i>
+          </div>
+          <p class="flash" style="color:var(--muted)">pauses during apply Â· never touches files. promise.</p>
+        </div>
+
+        <div class="footer">
+          <span><kbd>enter</kbd> scan</span>
+          <span><kbd>b</kbd> browse</span>
+          <span><kbd>tab</kbd> panes</span>
+          <span><kbd>click</kbd> everywhere</span>
+          <span><kbd>t</kbd> tetris focus</span>
+          <span><kbd>q</kbd> quit</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">Mockup 1/3 â Welcome hub Â· docs/mockups/01-welcome-hub.html</p>
+  </div>
+</body>
+</html>

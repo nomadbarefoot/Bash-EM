@@ -1,0 +1,19 @@
+[package]
+name = "bash-em"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bash-em"
+path = "src/main.rs"
+
+[dependencies]
+engine = { path = "../engine", features = ["serde"] }
+config = { path = "../config" }
+diff = { path = "../diff" }
+backup = { path = "../backup" }
+adapters = { path = "../adapters" }
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+serde_json = "1"
+serde_yaml = "0.9"

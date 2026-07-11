@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bash-EM mockup â Backups & Profiles</title>
+  <style>
+    :root {
+      --bg: #07080d;
+      --panel: #10121a;
+      --border: #2a3144;
+      --focus: #5ce1ff;
+      --guilty: #ff4d6d;
+      --clean: #b8f574;
+      --count: #ffe566;
+      --muted: #7a849c;
+      --text: #e8ecf7;
+      --accent: #ff8c42;
+      --font: "JetBrains Mono", "Fira Code", "SF Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(800px 480px at 50% 100%, #2a1810 0%, var(--bg) 45%);
+      color: var(--text); font-family: var(--font);
+      display: grid; place-items: center; padding: 2rem;
+    }
+    .frame {
+      width: min(1100px, 100%);
+      background: var(--bg);
+      border: 2px solid var(--border);
+      box-shadow: 0 25px 80px rgba(255, 140, 66, 0.1);
+    }
+    .titlebar {
+      text-align: center; padding: 0.55rem; border-bottom: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .titlebar .dash { color: var(--guilty); text-decoration: line-through; }
+    .tabs {
+      display: flex; gap: 0.25rem; padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border); align-items: center;
+    }
+    .tab { padding: 0.25rem 0.7rem; color: var(--muted); }
+    .tab.active { color: var(--bg); background: var(--accent); font-weight: 700; }
+    .path { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr auto auto;
+      gap: 0.5rem; padding: 0.5rem; min-height: 540px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); padding: 0.55rem 0.7rem;
+    }
+    .panel.focus { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+    .panel h2 {
+      margin: 0 0 0.45rem; font-size: 0.72rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em;
+      display: flex; justify-content: space-between;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.25rem; }
+    td { padding: 0.35rem 0.25rem; border-top: 1px solid #1a1f2c; }
+    tr.sel td { background: #1a2438; }
+    .id { color: var(--count); }
+    .ok { color: var(--clean); }
+    .yaml {
+      font-size: 0.78rem; line-height: 1.5; white-space: pre;
+      color: #c9d4ef; margin: 0;
+    }
+    .yaml .k { color: var(--focus); }
+    .yaml .v { color: var(--clean); }
+    .yaml .c { color: var(--muted); }
+    .yaml .on { color: var(--count); }
+    .confirm {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      border-color: var(--accent);
+    }
+    .btn {
+      border: 1px solid var(--accent); background: var(--accent); color: #1a0e08;
+      padding: 0.4rem 0.75rem; font-family: inherit; font-weight: 700;
+    }
+    .btn.ghost { background: transparent; color: var(--accent); }
+    .footer {
+      grid-column: 1 / -1; border: 1px solid var(--border);
+      padding: 0.4rem 0.65rem; color: var(--muted); font-size: 0.8rem;
+      display: flex; gap: 1rem; flex-wrap: wrap;
+    }
+    kbd {
+      color: var(--text); background: #1b2030; border: 1px solid var(--border);
+      padding: 0 0.3rem;
+    }
+    .note { margin-top: 1rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="frame">
+      <div class="titlebar">Bash<span class="dash">-</span>EM · vault &amp; preferences</div>
+      <div class="tabs">
+        <div class="tab">Welcome</div>
+        <div class="tab">Browse</div>
+        <div class="tab">Scan</div>
+        <div class="tab active">Backups</div>
+        <div class="tab">Profiles</div>
+        <div class="path">~/.bash-em/backups</div>
+      </div>
+      <div class="grid">
+        <div class="panel focus">
+          <h2><span>runs</span><span>2 of 12</span></h2>
+          <table>
+            <thead>
+              <tr><th>run</th><th>when</th><th>files</th><th>profile</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="id">run_1719a</td><td>3m ago</td><td>127</td><td>typographic</td></tr>
+              <tr class="sel"><td class="id">run_1718c</td><td>2h ago</td><td>64</td><td>typographic</td></tr>
+              <tr><td class="id">run_1710f</td><td>yesterday</td><td>12</td><td>aggressive</td></tr>
+              <tr><td class="id">run_16fe2</td><td>Mon</td><td>201</td><td>safe</td></tr>
+            </tbody>
+          </table>
+          <p style="color:var(--muted); font-size:0.78rem; margin:0.75rem 0 0;">
+            originals are content-addressed. restore is boring on purpose.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2><span>profile Â· typographic</span><span class="ok">valid yaml</span></h2>
+          <pre class="yaml"><span class="c"># editable here or on disk</span>
+<span class="k">name</span>: <span class="v">typographic</span>
+<span class="k">rules</span>:
+  <span class="k">em_dash</span>: { <span class="k">enabled</span>: <span class="on">true</span> }
+  <span class="k">en_dash</span>: { <span class="k">enabled</span>: <span class="on">true</span> }
+  <span class="k">curly_quotes</span>: { <span class="k">enabled</span>: <span class="on">false</span> }
+  <span class="k">llm_tells</span>: { <span class="k">enabled</span>: <span class="on">false</span> }
+<span class="k">prefs</span>:
+  <span class="k">backup_dir</span>: <span class="v">"~/.bash-em/backups"</span>
+  <span class="k">keep_last_n</span>: <span class="on">20</span></pre>
+        </div>
+
+        <div class="panel confirm">
+          <div>
+            <div style="font-weight:700; color:var(--accent);">restore run_1718c?</div>
+            <div style="color:var(--muted); font-size:0.85rem;">
+              64 files â essay-farm/ Â· profile hash matched Â· no sarcasm in this dialog
+            </div>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:0.5rem;">
+            <button class="btn">Restore</button>
+            <button class="btn ghost">Cancel</button>
+            <button class="btn ghost">Open in $EDITOR</button>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span><kbd>ââ</kbd> select run</span>
+          <span><kbd>r</kbd> restore</span>
+          <span><kbd>e</kbd> edit profile</span>
+          <span><kbd>tab</kbd> pane focus</span>
+          <span><kbd>click</kbd> works too</span>
+          <span style="color:var(--clean); margin-left:auto">safety copy is not a bit.</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">Mockup 3/3 â Backups + profiles Â· docs/mockups/03-backups-profiles.html</p>
+  </div>
+</body>
+</html>

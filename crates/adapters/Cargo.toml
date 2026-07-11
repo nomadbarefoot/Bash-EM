@@ -1,0 +1,15 @@
+[package]
+name = "adapters"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+engine = { path = "../engine" }
+config = { path = "../config" }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+quick-xml = "0.37"
+pdf-extract = "0.7"
+serde = { version = "1", features = ["derive"], optional = true }

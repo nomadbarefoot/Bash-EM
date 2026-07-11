@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bash-EM mockup â Scan / Review</title>
+  <style>
+    :root {
+      --bg: #07080d;
+      --panel: #10121a;
+      --border: #2a3144;
+      --focus: #5ce1ff;
+      --guilty: #ff4d6d;
+      --clean: #b8f574;
+      --count: #ffe566;
+      --muted: #7a849c;
+      --text: #e8ecf7;
+      --en: #d978ff;
+      --font: "JetBrains Mono", "Fira Code", "SF Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(900px 500px at 90% 0%, #142018 0%, var(--bg) 50%);
+      color: var(--text); font-family: var(--font);
+      display: grid; place-items: center; padding: 2rem;
+    }
+    .frame {
+      width: min(1100px, 100%);
+      background: var(--bg);
+      border: 2px solid var(--border);
+      box-shadow: 0 25px 80px rgba(92, 225, 255, 0.08);
+    }
+    .titlebar {
+      text-align: center; padding: 0.55rem; border-bottom: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .titlebar .dash { color: var(--guilty); text-decoration: line-through; }
+    .tabs {
+      display: flex; gap: 0.25rem; padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border); align-items: center;
+    }
+    .tab { padding: 0.25rem 0.7rem; color: var(--muted); }
+    .tab.active { color: var(--bg); background: var(--focus); font-weight: 700; }
+    .path { margin-left: auto; color: var(--muted); font-size: 0.8rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      grid-template-rows: auto auto 1fr auto auto;
+      gap: 0.5rem; padding: 0.5rem; min-height: 560px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); padding: 0.55rem 0.7rem;
+    }
+    .panel.focus { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+    .panel h2 {
+      margin: 0 0 0.45rem; font-size: 0.72rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.12em;
+      display: flex; justify-content: space-between;
+    }
+    .stats {
+      grid-column: 1 / -1;
+      display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+      font-size: 0.85rem;
+    }
+    .pill { color: var(--count); }
+    .pill.em { color: var(--guilty); }
+    .pill.en { color: var(--en); }
+    .list { list-style: none; margin: 0; padding: 0; font-size: 0.82rem; }
+    .list li {
+      display: grid; grid-template-columns: 1.2rem 3rem 1fr;
+      gap: 0.35rem; padding: 0.28rem 0.3rem; cursor: default;
+    }
+    .list li:hover { background: #181c2a; }
+    .list li.sel { background: #1a2438; outline: 1px solid #2f4466; }
+    .mark { color: var(--guilty); }
+    .mark.off { color: var(--muted); text-decoration: line-through; }
+    .n { color: var(--count); text-align: right; }
+    .diff { font-size: 0.8rem; line-height: 1.45; }
+    .diff .meta { color: var(--count); margin-bottom: 0.5rem; }
+    .diff .ln { color: var(--muted); }
+    .diff .rm { color: var(--guilty); }
+    .diff .ad { color: var(--clean); }
+    .rules {
+      grid-column: 1 / -1;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem;
+    }
+    .rule {
+      border: 1px solid var(--border); padding: 0.4rem 0.5rem; font-size: 0.78rem;
+    }
+    .rule.on { border-color: #3d5a2e; background: #121a12; }
+    .rule .state { color: var(--clean); float: right; }
+    .rule.off .state { color: var(--muted); }
+    .gauge-wrap { grid-column: 1 / -1; }
+    .gauge {
+      height: 1.2rem; background: #151925; border: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+    .gauge > i {
+      display: block; width: 62%; height: 100%;
+      background: linear-gradient(90deg, #2a6b3a, var(--clean));
+    }
+    .gauge label {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      font-size: 0.75rem; color: var(--bg); font-weight: 700;
+      mix-blend-mode: difference;
+    }
+    .footer {
+      grid-column: 1 / -1; border: 1px solid var(--border);
+      padding: 0.4rem 0.65rem; color: var(--muted); font-size: 0.8rem;
+      display: flex; gap: 1rem; flex-wrap: wrap;
+    }
+    kbd {
+      color: var(--text); background: #1b2030; border: 1px solid var(--border);
+      padding: 0 0.3rem;
+    }
+    .note { margin-top: 1rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="frame">
+      <div class="titlebar">Bash<span class="dash">-</span>EM · review — pick your targets</div>
+      <div class="tabs">
+        <div class="tab">Welcome</div>
+        <div class="tab">Browse</div>
+        <div class="tab active">Scan</div>
+        <div class="tab">Backups</div>
+        <div class="tab">Profiles</div>
+        <div class="path">~/Documents/LM_Projects/essay-farm</div>
+      </div>
+      <div class="grid">
+        <div class="panel stats">
+          <span>scanned <b>1,842</b></span>
+          <span style="color:var(--muted)">skipped 96</span>
+          <span>dirty <b>128</b></span>
+          <span class="pill em">â em 902</span>
+          <span class="pill en">â en 210</span>
+          <span class="pill">Î£ 1,284</span>
+          <span style="color:var(--focus); margin-left:auto">482 files/s Â· the dashes are sweating</span>
+        </div>
+
+        <div class="panel focus" style="grid-row: span 2;">
+          <h2><span>offenders (128)</span><span>click Â· space toggles</span></h2>
+          <ul class="list">
+            <li class="sel"><span class="mark">â</span><span class="n">142</span><span>posts/ai-essay.md</span></li>
+            <li><span class="mark">â</span><span class="n">89</span><span>deck/notes.xlsx</span></li>
+            <li><span class="mark">â</span><span class="n">67</span><span>site/blog/why-we-ship.astro</span></li>
+            <li><span class="mark off">â</span><span class="n">41</span><span>legal/contract.pdf</span></li>
+            <li><span class="mark">â</span><span class="n">38</span><span>README.md</span></li>
+            <li><span class="mark">â</span><span class="n">29</span><span>docs/overview.docx</span></li>
+            <li><span class="mark">â</span><span class="n">18</span><span>components/Hero.tsx</span></li>
+            <li><span class="mark">â</span><span class="n">12</span><span>public/about.html</span></li>
+          </ul>
+        </div>
+
+        <div class="panel" style="grid-row: span 2;">
+          <h2><span>preview Â· posts/ai-essay.md</span><span>text adapter</span></h2>
+          <div class="diff">
+            <div class="meta">em:120 en:14 bar:2 entities:6 Â· 44 lines affected</div>
+            <div class="ln">L12</div>
+            <div class="rm">- Models invent structureâthen abandon it.</div>
+            <div class="ad">+ Models invent structure - then abandon it.</div>
+            <br />
+            <div class="ln">L28</div>
+            <div class="rm">- âSmartâ quotesâ¦ and a &amp;mdash; for luck.</div>
+            <div class="ad">+ "Smart" quotes... and a - for luck.</div>
+            <br />
+            <div class="ln">L55</div>
+            <div class="rm">- Range 2019â2024 still gets an en-dash.</div>
+            <div class="ad">+ Range 2019-2024 still gets an en-dash.</div>
+            <div style="color:var(--muted); margin-top:0.6rem">â¦ and 41 more lines</div>
+          </div>
+        </div>
+
+        <div class="rules">
+          <div class="rule on">em_dash <span class="state">ON</span></div>
+          <div class="rule on">en_dash <span class="state">ON</span></div>
+          <div class="rule on">html_entities <span class="state">ON</span></div>
+          <div class="rule off">llm_tells <span class="state">OFF</span></div>
+        </div>
+
+        <div class="gauge-wrap panel">
+          <h2><span>extermination progress</span><span style="color:var(--clean)">backup sealed Â· run_1719â¦</span></h2>
+          <div class="gauge"><i></i><label>79 / 127 files Â· 811 dashes purged</label></div>
+        </div>
+
+        <div class="footer">
+          <span><kbd>ââ</kbd>/<kbd>jk</kbd> move</span>
+          <span><kbd>space</kbd> toggle</span>
+          <span><kbd>a</kbd> APPLY</span>
+          <span><kbd>click</kbd> select / toggle</span>
+          <span><kbd>scroll</kbd> list</span>
+          <span><kbd>l</kbd> log</span>
+          <span><kbd>q</kbd> quit</span>
+          <span style="color:var(--clean); margin-left:auto">backup first. then we get messy.</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">Mockup 2/3 â Scan / review Â· docs/mockups/02-scan-review.html</p>
+  </div>
+</body>
+</html>

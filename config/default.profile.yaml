@@ -1,0 +1,15 @@
+name: typographic
+rules:
+  em_dash: { enabled: true }
+  en_dash: { enabled: true }
+  horizontal_bar: { enabled: true }
+  html_dash_entities: { enabled: true }
+  curly_quotes: { enabled: false }
+prefs:
+  max_file_bytes: 10485760
+  preview_lines: 8
+  backup_dir: "~/.bash-em/backups"
+  skip_dirs: [".git", "node_modules", "target", "dist", "build"]
+ignore:
+  - "**/*.min.js"
+  - "**/package-lock.json"

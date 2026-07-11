@@ -5,7 +5,7 @@
 #   ./scripts/rename-project.sh --dry-run   # preview changes
 #   ./scripts/rename-project.sh             # apply changes
 #
-# Replaces text in tracked source/docs and renames paths containing the old name.
+# Replaces text in source/docs, including HTML span-split branding, and renames paths.
 # Includes this script itself. Skips .git/, target/, and common build dirs.
 
 set -euo pipefail
@@ -71,7 +71,33 @@ is_text_file() {
 }
 
 contains_old_name() {
-  grep -q -F "$OLD_NAME" "$1" 2>/dev/null || grep -q -F "$OLD_BRAND" "$1" 2>/dev/null
+    python3 - "$1" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+text = open(path, encoding="utf-8", errors="replace").read()
+old_hyphen = "bash" + "-" + "m"
+old_em = "bash" + "\u2014" + "m"
+if old_hyphen in text or old_em in text:
+    raise SystemExit(0)
+if re.search(r"bash<span[^>]*>\u2014</span>m", text):
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+show_matches() {
+    local file="$1"
+    grep -n -F "$OLD_NAME" "$file" 2>/dev/null || true
+    grep -n -F "$OLD_BRAND" "$file" 2>/dev/null || true
+    python3 - "$file" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+for i, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
+    if re.search(r"bash<span[^>]*>\u2014</span>m", line):
+        print(f"{i}:{line.rstrip()}")
+PY
 }
 
 replace_in_file() {
@@ -82,15 +108,25 @@ replace_in_file() {
 
     if $DRY_RUN; then
         echo "[dry-run] would edit: ${file#$ROOT/}"
-        grep -n -F "$OLD_NAME" "$file" 2>/dev/null || true
-        grep -n -F "$OLD_BRAND" "$file" 2>/dev/null || true
+        show_matches "$file"
         return 0
     fi
 
     local tmp
     tmp="$(mktemp)"
-    # Order matters: replace longer/branded form first if overlapping (they don't overlap here)
-    sed -e "s/${OLD_BRAND}/${NEW_BRAND}/g" -e "s/${OLD_NAME}/${NEW_NAME}/g" "$file" >"$tmp"
+    python3 - "$file" "$tmp" <<'PY'
+import re, sys
+
+src, dst = sys.argv[1], sys.argv[2]
+text = open(src, encoding="utf-8").read()
+old_hyphen = "bash" + "-" + "m"
+old_em = "bash" + "\u2014" + "m"
+new_name = "Bash-EM"
+text = re.sub(r"bash<span([^>]*)>\u2014</span>m", r"Bash<span\1>-</span>EM", text)
+text = text.replace(old_em, new_name)
+text = text.replace(old_hyphen, new_name)
+open(dst, "w", encoding="utf-8").write(text)
+PY
     mv "$tmp" "$file"
     echo "edited: ${file#$ROOT/}"
 }
@@ -124,6 +160,7 @@ echo
 # 1. Text replacements
 edited=0
 for file in "${ALL_FILES[@]}"; do
+    [[ "$file" == "$0" ]] && continue
     if is_text_file "$file" && contains_old_name "$file"; then
         replace_in_file "$file"
         ((edited++)) || true

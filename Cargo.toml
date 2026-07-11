@@ -1,10 +1,22 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
 [package]
-name = "Bash-EM"
-version = "0.1.0"
+name = "bash-em-workspace"
+version = "0.0.0"
 edition = "2021"
+publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dev-dependencies]
+engine = { path = "crates/engine", features = ["serde"] }
+config = { path = "crates/config" }
+diff = { path = "crates/diff" }
+backup = { path = "crates/backup" }
+adapters = { path = "crates/adapters" }
+serde_yaml = "0.9"
+serde_json = "1"
 
-[dependencies]
-ratatui = "0.26"
-crossterm = "0.27"
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
