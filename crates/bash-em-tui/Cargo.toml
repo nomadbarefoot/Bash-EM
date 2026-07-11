@@ -1,0 +1,17 @@
+[package]
+name = "bash-em-tui"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+tetris = []
+
+[dependencies]
+engine = { path = "../engine", features = ["serde"] }
+config = { path = "../config" }
+diff = { path = "../diff" }
+backup = { path = "../backup" }
+adapters = { path = "../adapters" }
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
