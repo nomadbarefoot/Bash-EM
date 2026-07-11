@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADBE — Growth & Reality-Adjusted Valuation Tearsheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF7F1;
+    --card:#FFFFFF;
+    --ink:#16191F;
+    --slate:#6B7480;
+    --line:#E4DED2;
+    --teal:#0F5C5A;       /* upside / reward */
+    --teal-soft:#3E8E84;
+    --clay:#B5482E;       /* penalty / downside / bear */
+    --clay-soft:#D98A73;
+    --amber:#C2871C;      /* signal / estimate / attention */
+    --ink-2:#2A2F38;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 24px 80px}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;margin:0;letter-spacing:-0.01em}
+  .num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- masthead ---------- */
+  .mast{border-top:3px solid var(--ink);padding-top:14px}
+  .mast-row{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px}
+  .ticker{font-family:"Bricolage Grotesque";font-weight:800;font-size:clamp(44px,9vw,84px);line-height:.9}
+  .ticker small{font-weight:500;font-size:.32em;letter-spacing:.04em;color:var(--slate);display:block;margin-top:6px}
+  .asof{text-align:right;font-size:12px;color:var(--slate);letter-spacing:.03em}
+  .asof b{color:var(--ink);font-weight:600}
+  .thesis{margin:18px 0 22px;font-size:clamp(15px,2.4vw,18px);max-width:78ch}
+  .thesis b{color:var(--clay)}
+
+  .strip{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;background:var(--card)}
+  .stat{padding:12px 14px;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+  .stat .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate)}
+  .stat .v{font-family:"IBM Plex Mono";font-weight:600;font-size:19px;margin-top:3px}
+  .stat .v.dn{color:var(--clay)}
+
+  /* ---------- sections ---------- */
+  section{margin-top:46px}
+  .eyebrow{display:flex;align-items:center;gap:10px;font-family:"IBM Plex Mono";font-size:11px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+  .eyebrow .bar{height:1px;flex:1;background:var(--line)}
+  h2{font-weight:700;font-size:clamp(22px,3.6vw,30px);line-height:1.05}
+  .lead{color:var(--ink-2);max-width:74ch;margin-top:10px;font-size:15px}
+  .lead b{color:var(--ink)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:18px}
+  figcaption{font-size:12.5px;color:var(--slate);margin-top:10px}
+  svg{display:block;width:100%;height:auto}
+
+  /* hero callouts */
+  .legend{display:flex;gap:20px;flex-wrap:wrap;font-size:12.5px;margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:22px;height:0;border-top-width:3px;border-top-style:solid;display:inline-block}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+  /* tier split */
+  .tier{margin-top:8px}
+  .tier-label{display:flex;justify-content:space-between;font-size:12.5px;margin:14px 0 6px}
+  .tier-label .t{font-weight:600}
+  .tier-label .s{color:var(--slate)}
+  .barrow{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-family:"IBM Plex Mono";
+    font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px}
+
+  /* scorecard */
+  .sc-head{display:grid;grid-template-columns:1.6fr .8fr .8fr 1.1fr;gap:8px;font-size:10.5px;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--slate);padding:0 4px 8px;border-bottom:1px solid var(--line)}
+  .sc-row{display:grid;grid-template-columns:1.6fr .8fr .8fr 1.1fr;gap:8px;align-items:center;
+    padding:9px 4px;border-bottom:1px solid var(--line);font-size:13px}
+  .sc-row .leg{font-weight:500}
+  .sc-row .leg em{display:block;font-style:normal;font-size:11px;color:var(--slate);margin-top:2px}
+  .sc-w{font-family:"IBM Plex Mono";font-weight:600;text-align:right}
+  .pen{color:var(--clay)} .rew{color:var(--teal)}
+  .track{height:8px;border-radius:5px;background:#F0EADF;overflow:hidden;margin-top:4px}
+  .fill{height:100%}
+  .sc-total{display:grid;grid-template-columns:1.6fr .8fr .8fr 1.1fr;gap:8px;padding:12px 4px 0;font-weight:700;
+    font-family:"IBM Plex Mono"}
+  .sc-foot{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px}
+  .pill{border:1px solid var(--line);border-radius:9px;padding:10px 14px;background:var(--card);flex:1;min-width:150px}
+  .pill .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--slate)}
+  .pill .v{font-family:"IBM Plex Mono";font-weight:600;font-size:21px;margin-top:2px}
+
+  /* scenario ladder handled in svg */
+  .scen{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  .scard{border:1px solid var(--line);border-radius:11px;padding:14px 15px 15px;background:var(--card);
+    position:relative;overflow:hidden}
+  .scard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .scard.bear::before{background:var(--clay)}
+  .scard.cen::before{background:var(--teal)}
+  .scard.base::before{background:var(--teal-soft)}
+  .scard.bull::before{background:var(--teal)}
+  .scard .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate)}
+  .scard .val{font-family:"IBM Plex Mono";font-weight:700;font-size:27px;margin:4px 0 1px;letter-spacing:-.02em}
+  .scard .ret{font-family:"IBM Plex Mono";font-weight:600;font-size:13px}
+  .scard .ret.up{color:var(--teal)} .scard .ret.flat{color:var(--clay)}
+  .scard .drv{font-size:11.5px;color:var(--ink-2);margin-top:10px;line-height:1.45}
+  .scard .knobs{font-family:"IBM Plex Mono";font-size:10.5px;color:var(--slate);margin-top:9px;
+    border-top:1px solid var(--line);padding-top:8px;line-height:1.5}
+  @media(max-width:760px){.scen{grid-template-columns:repeat(2,1fr)}}
+
+  /* verdict */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}.strip{grid-template-columns:repeat(3,1fr)}
+    .stat:nth-child(3){border-right:none}.sc-head,.sc-row,.sc-total{grid-template-columns:1.4fr .7fr .7fr;}
+    .sc-head .h-bar,.sc-row .track-cell,.sc-total .t-bar{display:none}}
+  .checklist{list-style:none;padding:0;margin:8px 0 0}
+  .checklist li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:flex-start}
+  .mark{flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-family:"IBM Plex Mono";
+    font-weight:600;font-size:13px;color:#fff;margin-top:1px}
+  .ok{background:var(--teal)} .no{background:var(--clay)} .mid{background:var(--amber)}
+  .checklist .lt{font-weight:600}
+  .checklist .ld{color:var(--slate);display:block;font-weight:400;margin-top:1px}
+  .mon{font-size:13px;color:var(--ink-2)}
+  .mon li{margin:7px 0}
+
+  /* ---------- dossier ---------- */
+  .find{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:18px 20px;margin-top:14px}
+  .find-top{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .find h3{font-size:18px;font-weight:700;line-height:1.15}
+  .tag{font-family:"IBM Plex Mono";font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .tag.p{background:#F7E9E4;color:var(--clay)}
+  .tag.r{background:#E4EFEC;color:var(--teal)}
+  .tag.n{background:#F0EDE4;color:var(--slate)}
+  .find p{font-size:13.5px;color:var(--ink-2);margin:11px 0 0;max-width:82ch}
+  .find p b{color:var(--ink)}
+  .data{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+  .chip{font-family:"IBM Plex Mono";font-size:11px;background:var(--paper);border:1px solid var(--line);
+    border-radius:6px;padding:4px 9px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  .owncol{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+  .ocard{border:1px solid var(--line);border-radius:11px;padding:16px 18px;background:var(--card)}
+  .ocard.acc{border-top:3px solid var(--teal)}
+  .ocard.dist{border-top:3px solid var(--clay)}
+  .ocard h4{font-family:"Bricolage Grotesque";font-size:14px;margin:0 0 4px;display:flex;justify-content:space-between}
+  .ocard h4 span{font-family:"IBM Plex Mono";font-size:11px;font-weight:500;color:var(--slate)}
+  .ocard ul{margin:8px 0 0;padding-left:17px;font-size:12.5px;color:var(--ink-2)}
+  .ocard li{margin:6px 0}
+
+  .ledger{width:100%;border-collapse:collapse;margin-top:4px;font-size:12.5px}
+  .ledger th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate);
+    padding:9px 10px;border-bottom:1px solid var(--line);font-weight:600}
+  .ledger td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .ledger .m{font-family:"IBM Plex Mono";font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ok-t{color:var(--teal);font-weight:600} .warn-t{color:var(--amber);font-weight:600}
+  @media(max-width:680px){.owncol{grid-template-columns:1fr}.ledger .hide{display:none}}
+
+  .foot{margin-top:54px;border-top:1px solid var(--line);padding-top:16px;font-size:11.5px;color:var(--slate);line-height:1.7}
+  .foot b{color:var(--ink)}
+
+  @media(prefers-reduced-motion:no-preference){
+    .reveal{opacity:0;transform:translateY(10px);animation:up .6s ease forwards}
+    @keyframes up{to{opacity:1;transform:none}}
+  }
+  @media print{body{background:#fff}.card,.strip,.pill{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== MASTHEAD ===== -->
+  <header class="mast reveal">
+    <div class="mast-row">
+      <div class="ticker">ADBE<small>ADOBE INC · NASDAQ · CONTRARIAN VALUE TEARSHEET</small></div>
+      <div class="asof">
+        AS OF <b>27 JUN 2026</b><br>
+        Damodaran FCFF DCF +<br>revenue-weighted overlay
+      </div>
+    </div>
+    <p class="thesis">At ~$195 the market prices a <b>permanently impaired</b> Adobe — a reverse-DCF implies
+      −3.5%/yr perpetual cash-flow decline. The realized numbers show a four-year <b>+11% growth plateau</b>,
+      not a cliff. The whole bet reduces to one variable: does the next cohort of creators still walk through the door.</p>
+
+    <div class="strip">
+      <div class="stat"><div class="k">Price</div><div class="v">$195</div></div>
+      <div class="stat"><div class="k">Market cap</div><div class="v">$77B</div></div>
+      <div class="stat"><div class="k">P/E (ttm)</div><div class="v">~11×</div></div>
+      <div class="stat"><div class="k">Levered FCF</div><div class="v">$10.3B</div></div>
+      <div class="stat"><div class="k">From ATH</div><div class="v dn">−72%</div></div>
+      <div class="stat"><div class="k">Street PT avg</div><div class="v">$282</div></div>
+    </div>
+  </header>
+
+  <!-- ===== HERO: PLATEAU VS PRICE ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>The signal</span><span class="bar"></span></div>
+    <h2>The plateau the market refuses to price</h2>
+    <p class="lead">Growth decelerated <b>once</b> — in FY22 — then held flat at low-double-digits for four straight years.
+      The price implies the opposite: a permanent fade into perpetual decline. The shaded band is the distance between
+      what Adobe <b>does</b> and what the price <b>says</b>.</p>
+    <figure class="card">
+      <svg viewBox="0 0 880 360" role="img" aria-label="Adobe realized revenue growth settling at ~11% versus market-implied terminal decline of −3.5%">
+        <!-- gridlines -->
+        <g class="num" font-size="11" fill="#9aa1ab">
+          <line x1="80" y1="60"  x2="840" y2="60"  stroke="#EEE7DA"/>
+          <line x1="80" y1="155" x2="840" y2="155" stroke="#EEE7DA"/>
+          <line x1="80" y1="250" x2="840" y2="250" stroke="#D8D0C2"/>
+          <text x="44" y="64">+25%</text>
+          <text x="44" y="159">+12%</text>
+          <text x="56" y="254">0%</text>
+          <text x="40" y="281">−3.5%</text>
+        </g>
+        <!-- mispricing band between plateau (~y170) and implied line (y277) -->
+        <path d="M260,159 L800,162 L800,277 L260,277 Z" fill="#B5482E" fill-opacity="0.07"/>
+        <!-- implied terminal decline line -->
+        <line x1="260" y1="277" x2="840" y2="277" stroke="#B5482E" stroke-width="2" stroke-dasharray="7 5"/>
+        <text x="600" y="295" class="num" font-size="12" fill="#B5482E" font-weight="600">market-implied terminal growth · −3.5%/yr</text>
+        <!-- realized growth line -->
+        <polyline points="120,75 260,159 400,173 540,168 680,170" fill="none" stroke="#0F5C5A" stroke-width="3"/>
+        <!-- projection dashed -->
+        <polyline points="680,170 800,161" fill="none" stroke="#0F5C5A" stroke-width="3" stroke-dasharray="6 5"/>
+        <!-- points -->
+        <g fill="#0F5C5A">
+          <circle cx="120" cy="75" r="5"/><circle cx="260" cy="159" r="5"/><circle cx="400" cy="173" r="5"/>
+          <circle cx="540" cy="168" r="5"/><circle cx="680" cy="170" r="5"/>
+        </g>
+        <circle cx="800" cy="161" r="5" fill="#fff" stroke="#0F5C5A" stroke-width="3"/>
+        <!-- value labels -->
+        <g class="num" font-size="12" font-weight="600" fill="#16191F">
+          <text x="120" y="60" text-anchor="middle">+23%</text>
+          <text x="260" y="146" text-anchor="middle">+12%</text>
+          <text x="400" y="160" text-anchor="middle">+10%</text>
+          <text x="540" y="155" text-anchor="middle">+11%</text>
+          <text x="680" y="157" text-anchor="middle">+11%</text>
+          <text x="800" y="148" text-anchor="middle" fill="#C2871C">+12%e</text>
+        </g>
+        <!-- x labels -->
+        <g class="num" font-size="12" fill="#6B7480" text-anchor="middle">
+          <text x="120" y="320">FY21</text><text x="260" y="320">FY22</text><text x="400" y="320">FY23</text>
+          <text x="540" y="320">FY24</text><text x="680" y="320">FY25</text><text x="800" y="320">FY26e</text>
+        </g>
+        <!-- plateau bracket label -->
+        <text x="470" y="135" class="num" font-size="12.5" fill="#0F5C5A" font-weight="600" text-anchor="middle">realized plateau · ~+11% for 4 yrs</text>
+        <!-- the gap arrow -->
+        <line x1="730" y1="172" x2="730" y2="275" stroke="#16191F" stroke-width="1" marker-end="url(#a)" marker-start="url(#a)"/>
+        <defs><marker id="a" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <path d="M1,1 L4,4 L1,7" fill="none" stroke="#16191F" stroke-width="1"/></marker></defs>
+        <text x="742" y="228" font-size="12" fill="#16191F" font-weight="600">the gap =</text>
+        <text x="742" y="244" font-size="12" fill="#16191F" font-weight="600">the thesis</text>
+      </svg>
+      <figcaption>Reported revenue growth, fiscal years. FY26e is the post-Q2 raised guide (~+12%), partly inorganic (Semrush).
+        Implied terminal growth solved from reverse-DCF at $77B cap, r = 9.5%.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== REVENUE BARS ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Top line</span><span class="bar"></span></div>
+    <h2>$15.8B → $26.5B in five years — compounding through the de-rating</h2>
+    <p class="lead">The stock fell ~72% from its peak while revenue rose every single year. The de-rating is a
+      <b>multiple story, not a fundamentals story</b> — which is the entire setup.</p>
+    <figure class="card">
+      <svg viewBox="0 0 880 300" role="img" aria-label="Adobe annual revenue FY21 to FY26 estimate">
+        <line x1="60" y1="260" x2="850" y2="260" stroke="#D8D0C2"/>
+        <!-- bars: x, height (scale 7.14 px/$B from y=260) -->
+        <g>
+          <rect x="90"  y="147" width="86" height="113" rx="4" fill="#0F5C5A"/>
+          <rect x="220" y="134" width="86" height="126" rx="4" fill="#0F5C5A"/>
+          <rect x="350" y="121" width="86" height="139" rx="4" fill="#0F5C5A"/>
+          <rect x="480" y="106" width="86" height="154" rx="4" fill="#0F5C5A"/>
+          <rect x="610" y="90"  width="86" height="170" rx="4" fill="#0F5C5A"/>
+          <rect x="740" y="70"  width="86" height="190" rx="4" fill="none" stroke="#C2871C" stroke-width="2" stroke-dasharray="5 4"/>
+        </g>
+        <g class="num" font-size="14" font-weight="600" fill="#16191F" text-anchor="middle">
+          <text x="133" y="138">$15.8B</text><text x="263" y="125">$17.6B</text><text x="393" y="112">$19.4B</text>
+          <text x="523" y="97">$21.5B</text><text x="653" y="81">$23.8B</text>
+          <text x="783" y="61" fill="#C2871C">$26.5B</text>
+        </g>
+        <g class="num" font-size="12" fill="#6B7480" text-anchor="middle">
+          <text x="133" y="280">FY21</text><text x="263" y="280">FY22</text><text x="393" y="280">FY23</text>
+          <text x="523" y="280">FY24</text><text x="653" y="280">FY25</text><text x="783" y="280">FY26e</text>
+        </g>
+      </svg>
+      <figcaption>Total revenue. Solid = reported; dashed amber = FY26 guidance midpoint.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== SUBSCRIPTION TIERS ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Who pays</span><span class="bar"></span></div>
+    <h2>A locked-in corporate core, fed by a faster-growing individual funnel</h2>
+    <p class="lead">Adobe doesn't disclose a clean "individuals vs. corporations" line, so it takes two cuts.
+      The takeaway that matters: <b>the smaller, contested tier is the faster grower</b> — the door isn't closing, it's the
+      busiest entrance.</p>
+
+    <div class="card tier">
+      <div class="tier-label"><span class="t">By segment — what's sold</span><span class="s">FY25 · $23.8B total</span></div>
+      <div class="barrow">
+        <div class="seg" style="width:74%;background:var(--teal)">Digital Media · 74%</div>
+        <div class="seg" style="width:25%;background:var(--ink-2)">Digital Experience · 25%</div>
+        <div class="seg" style="width:1%;background:var(--slate)"></div>
+      </div>
+
+      <div class="tier-label" style="margin-top:22px"><span class="t">By customer group — who buys</span><span class="s">FY25 · $22.8B subscription</span></div>
+      <div class="barrow">
+        <div class="seg" style="width:71%;background:var(--ink-2)">Creative &amp; Marketing Pros · 71% &nbsp;·&nbsp; +10%</div>
+        <div class="seg" style="width:29%;background:var(--amber)">Biz Pros &amp; Consumers · 29% &nbsp;·&nbsp; +15%</div>
+      </div>
+      <figcaption>Digital Experience is ~100% enterprise. "Creative &amp; Marketing Pros" spans pro creatives, agencies and
+        enterprise ETLAs; "Business Pros &amp; Consumers" is Acrobat / Express / individual plans — the self-serve funnel,
+        growing 15% vs. 10% for the pro/enterprise block. Pure "average-individual" revenue ≈ a quarter-to-a-third of the total;
+        the durable two-thirds is professional / corporate.</figcaption>
+    </div>
+  </section>
+
+  <!-- ===== SCORECARD REFINEMENT ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Method · refined</span><span class="bar"></span></div>
+    <h2>Revenue-weighted penalty / reward overlay</h2>
+    <p class="lead">Flat-weighting applies every penalty to 100% of fair value — over-penalizing risks confined to the small
+      slice. Scoping each leg to its <b>actual affected base</b> lifts the adjusted central from $341 to <b>~$385</b>.
+      The one exception: the <b>entry leak is a terminal-value risk</b>, so it's weighted against ~the perpetuity (where
+      56% of DCF value sits), not today's 29% funnel — otherwise the method flatters.</p>
+
+    <div class="card">
+      <div class="sc-head">
+        <span>Leg · affected base</span><span style="text-align:right">Flat</span><span style="text-align:right">Weighted</span><span class="h-bar">Impact</span>
+      </div>
+      <!-- penalties -->
+      <div class="sc-row"><div class="leg">New-creator entry leak <em>terminal-value exposure ~40%</em></div>
+        <div class="sc-w pen">−17%</div><div class="sc-w pen">−15.2%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:76%;background:var(--clay)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Voluntary retention (post-FTC) <em>individual/SMB plans ~45%</em></div>
+        <div class="sc-w pen">−8%</div><div class="sc-w pen">−4.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:20%;background:var(--clay)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Margin compression <em>company-wide · AI compute</em></div>
+        <div class="sc-w pen">−7%</div><div class="sc-w pen">−6.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:30%;background:var(--clay)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Leadership vacuum <em>company-wide · execution variance</em></div>
+        <div class="sc-w pen">−5%</div><div class="sc-w pen">−4.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:20%;background:var(--clay)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Regulatory beta <em>company-wide · CoC drag</em></div>
+        <div class="sc-w pen">−3%</div><div class="sc-w pen">−3.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:15%;background:var(--clay)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Adobe Stock substitution <em>~2% of revenue · canary</em></div>
+        <div class="sc-w pen">−2%</div><div class="sc-w pen">−1.2%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:6%;background:var(--clay)"></div></div></div></div>
+      <!-- rewards -->
+      <div class="sc-row"><div class="leg">Enterprise / PDF lock-in <em>protects ~50% of the co</em></div>
+        <div class="sc-w rew">+5%</div><div class="sc-w rew">+7.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:35%;background:var(--teal)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Token / credit monetization <em>small base · option value</em></div>
+        <div class="sc-w rew">+5%</div><div class="sc-w rew">+4.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:20%;background:var(--teal)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Buyback accretion <em>now ~32% of cap below intrinsic</em></div>
+        <div class="sc-w rew">+5%</div><div class="sc-w rew">+5.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:25%;background:var(--teal)"></div></div></div></div>
+      <div class="sc-row"><div class="leg">Net cash + FCF optionality <em>balance-sheet buffer</em></div>
+        <div class="sc-w rew">+2%</div><div class="sc-w rew">+2.0%</div>
+        <div class="track-cell"><div class="track"><div class="fill" style="width:10%;background:var(--teal)"></div></div></div></div>
+
+      <div class="sc-total">
+        <div>Net adjustment</div>
+        <div class="sc-w pen" style="opacity:.6">−25%</div>
+        <div class="sc-w" style="color:var(--ink)">−15.4%</div>
+        <div class="t-bar"></div>
+      </div>
+
+      <div class="sc-foot">
+        <div class="pill"><div class="k">Clean base DCF</div><div class="v">$458</div></div>
+        <div class="pill"><div class="k">Flat-adjusted</div><div class="v" style="color:var(--slate)">$341</div></div>
+        <div class="pill"><div class="k">Revenue-weighted</div><div class="v" style="color:var(--teal)">$385</div></div>
+        <div class="pill"><div class="k">Indep. conservative DCF</div><div class="v">~$370</div></div>
+      </div>
+      <figcaption style="margin-top:14px">Two independent methods (weighted overlay $385, conservative DCF $370) now converge inside one
+        zone — tighter than the flat $341.</figcaption>
+    </div>
+  </section>
+
+  <!-- ===== SCENARIO LADDER ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Asymmetry</span><span class="bar"></span></div>
+    <h2>No modeled scenario lands below today's price</h2>
+    <p class="lead">Rebuilding the bear on its own stated inputs (FCF flat 5 yrs → −3%/yr, r = 10%) gives <b>~$218</b>, not $200 —
+      so the modeled floor sits ~12% <b>above</b> spot. Correcting that one arithmetic slip actually strengthens the asymmetry.</p>
+    <figure class="card">
+      <svg viewBox="0 0 880 200" role="img" aria-label="Scenario value ladder from current price to bull case">
+        <line x1="70" y1="120" x2="840" y2="120" stroke="#D8D0C2"/>
+        <!-- ticks: x($)=90+($-150)*1.78 -->
+        <!-- price 195 -->
+        <g><line x1="170" y1="108" x2="170" y2="132" stroke="#16191F" stroke-width="2"/>
+          <text x="170" y="150" text-anchor="middle" class="num" font-size="12" font-weight="600">$195</text>
+          <text x="170" y="166" text-anchor="middle" font-size="10.5" fill="#6B7480">PRICE</text>
+          <circle cx="170" cy="96" r="4" fill="#16191F"/></g>
+        <!-- bear 218 -->
+        <g><line x1="211" y1="112" x2="211" y2="128" stroke="#B5482E" stroke-width="2"/>
+          <text x="211" y="92" text-anchor="middle" class="num" font-size="12" font-weight="600" fill="#B5482E">$218</text>
+          <text x="211" y="80" text-anchor="middle" font-size="10" fill="#B5482E">BEAR</text></g>
+        <!-- street 282 -->
+        <g><line x1="325" y1="112" x2="325" y2="128" stroke="#6B7480" stroke-width="2"/>
+          <text x="325" y="150" text-anchor="middle" class="num" font-size="12" fill="#6B7480">$282</text>
+          <text x="325" y="166" text-anchor="middle" font-size="10.5" fill="#6B7480">STREET</text></g>
+        <!-- EV 374 -->
+        <g><line x1="489" y1="112" x2="489" y2="128" stroke="#C2871C" stroke-width="2"/>
+          <text x="489" y="92" text-anchor="middle" class="num" font-size="12" font-weight="600" fill="#C2871C">$374</text>
+          <text x="489" y="80" text-anchor="middle" font-size="10" fill="#C2871C">EV</text></g>
+        <!-- weighted central 385 -->
+        <g><line x1="508" y1="108" x2="508" y2="132" stroke="#0F5C5A" stroke-width="3"/>
+          <text x="540" y="150" text-anchor="middle" class="num" font-size="12" font-weight="700" fill="#0F5C5A">$385</text>
+          <text x="540" y="166" text-anchor="middle" font-size="10.5" fill="#0F5C5A">WEIGHTED CENTRAL</text></g>
+        <!-- base 458 -->
+        <g><line x1="638" y1="112" x2="638" y2="128" stroke="#0F5C5A" stroke-width="2"/>
+          <text x="638" y="92" text-anchor="middle" class="num" font-size="12" font-weight="600" fill="#0F5C5A">$458</text>
+          <text x="638" y="80" text-anchor="middle" font-size="10" fill="#0F5C5A">BASE</text></g>
+        <!-- bull 540 -->
+        <g><line x1="784" y1="112" x2="784" y2="128" stroke="#0F5C5A" stroke-width="2"/>
+          <text x="784" y="92" text-anchor="middle" class="num" font-size="12" font-weight="600" fill="#0F5C5A">$540</text>
+          <text x="784" y="80" text-anchor="middle" font-size="10" fill="#0F5C5A">BULL</text></g>
+        <!-- upside band shading from price to weighted -->
+        <rect x="170" y="116" width="338" height="8" fill="#0F5C5A" fill-opacity="0.12"/>
+      </svg>
+      <figcaption>Per-share intrinsic outputs vs. spot. EV = probability-weighted (25% bull / 45% weighted-central / 30% bear)
+        ≈ $374, ~+92% vs. price. Downside to the modeled bear is ~+12%.</figcaption>
+    </figure>
+
+    <div class="scen">
+      <div class="scard bear">
+        <div class="lab">Bear · impairment</div>
+        <div class="val" style="color:var(--clay)">$218</div>
+        <div class="ret flat">+12% vs price</div>
+        <div class="drv">The market is right — creators stop walking through the door and FCF erodes.</div>
+        <div class="knobs">FCF₁ $10.0B · flat 5y → −3%/yr<br>r 10.0% · term g −2%</div>
+      </div>
+      <div class="scard cen">
+        <div class="lab">Weighted central</div>
+        <div class="val" style="color:var(--teal)">$385</div>
+        <div class="ret up">+97% vs price</div>
+        <div class="drv">Base DCF minus the revenue-weighted penalty/reward overlay. The working anchor.</div>
+        <div class="knobs">Base $458 × (1 − 15.4%)<br>≈ conservative DCF ~$370</div>
+      </div>
+      <div class="scard base">
+        <div class="lab">Base · moat holds</div>
+        <div class="val" style="color:var(--teal)">$458</div>
+        <div class="ret up">+135% vs price</div>
+        <div class="drv">Growth and switching costs hold cleanly; no permanent impairment.</div>
+        <div class="knobs">FCF₁ $10.0B · fade 9→3%<br>r 9.5% · term g 3.0%</div>
+      </div>
+      <div class="scard bull">
+        <div class="lab">Bull · door stays open</div>
+        <div class="val" style="color:var(--teal)">$540</div>
+        <div class="ret up">+177% vs price</div>
+        <div class="drv">Freemium converts, credits scale, the next creator cohort still starts in Adobe.</div>
+        <div class="knobs">FCF₁ $10.3B · fade 10→3.5%<br>r 9.25% · term g 3.5%</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== VERDICT ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Read</span><span class="bar"></span></div>
+    <h2>Textbook contrarian setup — with the chart still falling</h2>
+    <div class="grid2">
+      <div class="card">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);margin-bottom:4px">Entry framework · 4 of 5 legs</div>
+        <ul class="checklist">
+          <li><span class="mark ok">✓</span><span><span class="lt">Sentiment trough</span><span class="ld">8-year low, ~72% off ATH — max pessimism</span></span></li>
+          <li><span class="mark ok">✓</span><span><span class="lt">Smart-money divergence</span><span class="ld">Burry re-adding (June); company bought $2.1B in Q2</span></span></li>
+          <li><span class="mark ok">✓</span><span><span class="lt">Thesis intact / improving</span><span class="ld">Guidance raised; ARR stable; AI-first ARR tripled past $500M</span></span></li>
+          <li><span class="mark mid">~</span><span><span class="lt">Catalyst</span><span class="ld">Slow — ARR-durability proof over quarters, no sharp trigger</span></span></li>
+          <li><span class="mark no">✕</span><span><span class="lt">Technical base</span><span class="ld">Fresh 52-wk low printed — no consolidation / volume confirm yet</span></span></li>
+        </ul>
+        <p style="font-size:13px;color:var(--ink-2);margin:14px 0 0">By your own rules, the disciplined move isn't "buy" or "pass" —
+          it's <b>stage entry</b> and let the base form. The knife hasn't landed.</p>
+      </div>
+      <div class="card">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);margin-bottom:8px">Quarterly monitorables</div>
+        <ul class="mon" style="padding-left:18px">
+          <li><b>Organic vs. inorganic ARR</b> — strip out Semrush/Topaz; the door must open <i>organically</i></li>
+          <li><b>Business Pros &amp; Consumers growth</b> — the funnel; holding ~15% = door open</li>
+          <li><b>Net revenue retention</b> post-settlement — voluntary stickiness, untested</li>
+          <li><b>Operating margin</b> (~44.5%) — re-expands vs. structural slide</li>
+          <li><b>CEO pick</b> — internal-continuity vs. external-AI reset</li>
+          <li><b>Buyback pace vs. M&amp;A</b> — competing for the same FCF pool</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DOSSIER ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>The dossier · evidence behind the numbers</span><span class="bar"></span></div>
+    <h2>What's underneath each weight</h2>
+    <p class="lead">Every line in the scorecard traces to a finding here. Each is tagged with the leg it feeds, so the
+      decision matrix above and the evidence below stay welded together.</p>
+
+    <div class="find">
+      <div class="find-top"><h3>The freemium ↔ lock-in reckoning</h3><span class="tag p">PENALTY · retention −4%</span></div>
+      <p>The FTC/DOJ case settled for <b>$150M</b> ($75M civil penalty + $75M free services) under ROSCA, approved by
+        Judge Noël Wise on 10 Apr 2026. The injunction forces clear early-termination-fee disclosure, trial-conversion
+        reminders, and frictionless cancellation. President David Wadhwani was named personally. With subscriptions at
+        <b>97% of revenue</b>, the read is that some headline retention was cancellation friction, not loyalty — now legally
+        removed. True <b>voluntary</b> stickiness is untested, and the freemium pivot is partly a forced migration to
+        funnel-and-value retention. This is the origin of the "ARR durability" fear.</p>
+      <div class="data"><span class="chip">$150M settlement</span><span class="chip">approved 10 Apr 2026</span><span class="chip">subs = 97% of rev</span></div>
+    </div>
+
+    <div class="find">
+      <div class="find-top"><h3>The moat, precisely — what it does and doesn't protect</h3><span class="tag r">REWARD · lock-in +7%</span></div>
+      <p>~<b>98% of the Fortune 500</b>, 30M+ subscriptions, ~130% net revenue retention, file-format standards
+        (.PSD/.AI/.PDF), and 3-year enterprise ETLAs. Acrobat/PDF is the most durable layer. The nuance that makes this
+        leg <b>both</b> the dominant reward and the mirror of the dominant penalty: lock-in protects the <b>installed base,
+        not new-creator entry</b>. The wall is high around who's already inside; it does nothing for who walks in next.</p>
+      <div class="data"><span class="chip">98% of F500</span><span class="chip">~130% NRR</span><span class="chip">3-yr ETLAs</span><span class="chip">format lock-in</span></div>
+    </div>
+
+    <div class="find">
+      <div class="find-top"><h3>"Design is dying" is the wrong question</h3><span class="tag n">CONTEXT · entry leak</span></div>
+      <p>BLS projects a ~2–3% decline in <b>traditional</b> graphic-design employment through 2032 — but UX/product design
+        +16%, and the total design market grows from ~$46B to ~$78–81B. The field bifurcates: commodity execution collapses,
+        strategic / brand / UX / motion expands. Adobe runs <b>850M+ MAUs (+17%)</b>. The key distinction: a labor trend is
+        not a software-spend trend — spend rises as non-designers buy tools. So the entry leak is a <b>share / monetization</b>
+        question, not a terminal-decline input.</p>
+      <div class="data"><span class="chip">design mkt $46B→$80B</span><span class="chip">UX jobs +16%</span><span class="chip">850M MAU +17%</span></div>
+    </div>
+
+    <div class="find">
+      <div class="find-top"><h3>The AI pivot is an aggregation play, not a model race</h3><span class="tag r">REWARD · monetization +4%</span></div>
+      <p>Generative <b>credits = tokens</b> (Adobe's own framing — "like a data plan"); premium and video models cost more,
+        and no-rollover drives consumption. Adobe <b>opened the model layer</b> — 30+ third-party models including Veo, OpenAI,
+        Runway, Luma, Kling, FLUX and Topaz — while keeping orchestration, billing, and commercial-safety (Content Credentials)
+        <b>closed</b>. That commoditizes supply and owns demand: Adobe needn't win the model race to win the workflow. Topaz was
+        acquired to bring the best primitive in-house. AI-first ARR tripled past <b>$500M</b>.</p>
+      <div class="data"><span class="chip">30+ models, billing closed</span><span class="chip">credits = tokens</span><span class="chip">AI-first ARR &gt;$500M, 3×</span></div>
+    </div>
+
+    <div class="find">
+      <div class="find-top"><h3>Management is variance, not direction</h3><span class="tag p">PENALTY · execution −4%</span></div>
+      <p>Narayen (18 years, ~25× revenue) steps down once a successor is named and stays as <b>Chair</b>. CFO Dan Durn left
+        for Marvell on 15 Jun — a simultaneous CEO+CFO vacancy during a risky pivot. Internal contenders: Wadhwani (named in
+        the DOJ complaint) and Chakravarthy; an external AI-focused search is underway. Model this as a <b>wider distribution</b>,
+        not a direction. Critically, the thesis doesn't need Adobe to become customer-friendly — the predatory, high-switching-cost
+        engine is load-bearing and profitable. The CEO question barely moves intrinsic value.</p>
+      <div class="data"><span class="chip">CEO + CFO vacancy</span><span class="chip">Durn → Marvell, 15 Jun</span><span class="chip">Narayen stays Chair</span></div>
+    </div>
+
+    <div class="find">
+      <div class="find-top"><h3>Ownership &amp; flow — the sentiment-arbitrage leg</h3><span class="tag n">SIGNAL · half-firing, freshening</span></div>
+      <p>Textbook max-pessimism shape: broad institutions distributing into the decline while a marquee contrarian and the
+        company itself accumulate. The accumulation signals are <b>fresh</b>; the distribution data is stale (Q1 13F, as-of
+        31 Mar — it predates the June capitulation).</p>
+      <div class="owncol">
+        <div class="ocard acc">
+          <h4>Accumulating <span>fresh</span></h4>
+          <ul>
+            <li>Burry re-added in June, ~$240 contrarian-software basket (also CRM — overlaps your book)</li>
+            <li>Company is the biggest buyer: $25B buyback, ~$2.1B bought in Q2 alone</li>
+            <li>Value funds opening positions into the washout</li>
+          </ul>
+        </div>
+        <div class="ocard dist">
+          <h4>Distributing <span>stale · Q1 13F</span></h4>
+          <ul>
+            <li>922 institutions added vs. 1,519 cut (net sellers by count)</li>
+            <li>Wellcome Trust fully exited (~$181M); insiders 0 buys / 6 sells in 6mo</li>
+            <li>As-of 31 Mar — predates the June drop to ~$190s; Q2 filings land mid-Aug</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== WHAT CHANGED ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Delta · since the working doc</span><span class="bar"></span></div>
+    <h2>What's new — and what it does to the thesis</h2>
+    <div class="find">
+      <p><b>Topaz Labs — confirmed.</b> The acquisition the doc assumed is now announced (~24 Jun, terms undisclosed),
+        validating the aggregation thesis — best upscaling primitive brought in-house.</p>
+      <p style="margin-top:14px"><b>Semrush — acquired.</b> Bolsters total ARR to ~$27.1B (+12.5%), but means part of the
+        growth is <b>inorganic</b>. The thesis lives on <i>organic</i> new-creator entry, so this partially masks the very signal
+        you need to see. → new monitorable: organic vs. inorganic ARR.</p>
+      <p style="margin-top:14px"><b>Buyback got more accretive.</b> At the $247 authorization price it was ~23% of cap; at
+        ~$195 it's now <b>~32%</b>. The de-rating mechanically boosted the per-share value transfer.</p>
+      <p style="margin-top:14px"><b>Analyst capitulation is now visible</b>, not just 13F-implied: RBC $350→$285,
+        Citi $264→$228, Freedom Broker cut to Hold; mean PT compressed to ~$282. The Street's specific fear is exactly the
+        big penalty leg — does the funnel convert.</p>
+      <p style="margin-top:14px"><b>Agentic positioning.</b> Cannes Lions partnerships (Accenture, Omnicom, WPP, Anthropic,
+        Microsoft) and Disney tapping Adobe for concept design — small "door stays open" tells reframing Adobe as agentic
+        infrastructure rather than disruption target.</p>
+      <div class="data">
+        <span class="chip">Topaz confirmed</span><span class="chip">Semrush → inorganic ARR</span>
+        <span class="chip">buyback ~32% of cap</span><span class="chip">mean PT $282</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== VERIFICATION LEDGER ===== -->
+  <section class="reveal">
+    <div class="eyebrow"><span>Verification ledger</span><span class="bar"></span></div>
+    <h2>Every anchor, checked against filings</h2>
+    <div class="card" style="padding:6px 8px">
+      <table class="ledger">
+        <thead><tr><th>Claim</th><th class="hide">Doc</th><th>Live (27 Jun)</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Price / market cap</td><td class="m hide">~$200 / ~$77B</td><td class="m">$193–201 / $77B</td><td class="ok-t">verified</td></tr>
+          <tr><td>Q2 FY26 revenue</td><td class="m hide">—</td><td class="m">$6.62B · +13% YoY</td><td class="ok-t">verified</td></tr>
+          <tr><td>FY26 revenue guide</td><td class="m hide">$26.5–26.6B</td><td class="m">$26.5–26.6B (raised)</td><td class="ok-t">verified</td></tr>
+          <tr><td>Non-GAAP op margin</td><td class="m hide">~44.5%</td><td class="m">44.5%</td><td class="ok-t">verified</td></tr>
+          <tr><td>AI-first ARR</td><td class="m hide">&gt;$500M, 3×</td><td class="m">tripled past $500M</td><td class="ok-t">verified</td></tr>
+          <tr><td>FTC/DOJ settlement</td><td class="m hide">$150M, Apr-26</td><td class="m">$150M · approved 10 Apr 26</td><td class="ok-t">verified</td></tr>
+          <tr><td>Buyback authorization</td><td class="m hide">$25B → Apr-30</td><td class="m">$25B → 30 Apr 2030</td><td class="ok-t">verified</td></tr>
+          <tr><td>Levered FCF (ttm)</td><td class="m hide">~$10.3B</td><td class="m">$10.3B</td><td class="ok-t">verified</td></tr>
+          <tr><td>CFO departure</td><td class="m hide">Durn → Marvell</td><td class="m">left 15 Jun 2026</td><td class="ok-t">verified</td></tr>
+          <tr><td>Base-case per-share</td><td class="m hide">~$455</td><td class="m">$458 (recompute)</td><td class="warn-t">rounding</td></tr>
+          <tr><td>Bear-case per-share</td><td class="m hide">~$200</td><td class="m">$218 (recompute)</td><td class="warn-t">corrected</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <b>Method:</b> 10-yr FCFF DCF · bottom-up beta · terminal g ≤ risk-free · reverse-DCF anchor · revenue-weighted overlay.<br>
+    <b>Sources:</b> Adobe 8-K / 10-Q (FY21–Q2 FY26), FTC/DOJ settlement record (approved 10 Apr 2026), $25B buyback
+    authorization (21 Apr 2026 → 30 Apr 2030). Price &amp; cap as of 27 Jun 2026. MEMEX: no ADBE node on file.
+  </footer>
+
+</div>
+<script>
+  // gentle staggered reveal, respecting reduced motion
+  if(matchMedia('(prefers-reduced-motion: no-preference)').matches){
+    document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.animationDelay=(i*0.06)+'s';});
+  }
+</script>
+</body>
+</html>

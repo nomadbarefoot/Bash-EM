@@ -1,0 +1,650 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import {
+  storeProducts,
+  getStoreProduct,
+  getProductHref,
+  payhipBuyUrl,
+} from "../../data/payhip-products";
+
+export function getStaticPaths() {
+  return storeProducts.map((p) => ({ params: { slug: p.slug } }));
+}
+
+const { slug } = Astro.params;
+const product = getStoreProduct(slug as string);
+if (!product) return Astro.redirect("/store");
+
+const otherProducts = storeProducts.filter((p) => p.slug !== slug).slice(0, 3);
+const buyUrl = payhipBuyUrl(product.productId);
+const imageList = [product.image, ...(product.gallery ?? [])];
+const hasCarousel = imageList.length > 1;
+---
+<BaseLayout
+  title={`${product.title} — Ayan Nag`}
+  description={product.description || `${product.title} by Ayan Nag.`}
+  ogImage={product.image}
+>
+  <article class="pdp container">
+    <div class="pdp__images">
+      {hasCarousel ? (
+        <div class="carousel" role="region" aria-label="Product images" tabindex="0">
+          <div class="carousel__track">
+            {imageList.map((src, i) => (
+              <figure class="carousel__slide">
+                <img src={src} alt={`${product.title} (${i + 1})`} class="carousel__img" loading={i === 0 ? "eager" : "lazy"} draggable="false" />
+              </figure>
+            ))}
+          </div>
+          <button class="carousel__control carousel__control--prev" data-carousel-prev aria-label="Previous image" type="button" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          </button>
+          <button class="carousel__control carousel__control--next" data-carousel-next aria-label="Next image" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+          <div class="carousel__dots">
+            {imageList.map((_, i) => (
+              <button class:list={["carousel__dot", { "carousel__dot--active": i === 0 }]} data-carousel-dot={i} aria-label={`Go to image ${i + 1}`} type="button" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <figure class="pdp__hero">
+          <img
+            src={product.image}
+            alt={product.title}
+            width={product.width}
+            height={product.height}
+            class="pdp__hero-img"
+          />
+        </figure>
+      )}
+    </div>
+
+    <aside class="pdp__sidebar">
+      <nav class="pdp__breadcrumb" aria-label="Breadcrumb">
+        <a href="/store" class="pdp__breadcrumb-link">Store</a>
+        <span class="pdp__breadcrumb-sep">/</span>
+        <span class="pdp__breadcrumb-current">{product.category}</span>
+      </nav>
+
+      <h1 class="pdp__title">{product.title}</h1>
+
+      {product.tagline && (
+        <p class="pdp__tagline">{product.tagline}</p>
+      )}
+
+      <div class="pdp__price-row">
+        <span class="pdp__price">{product.price}</span>
+        {product.format && (
+          <span class="pdp__format">{product.format}</span>
+        )}
+      </div>
+
+      <div class="pdp__actions">
+        <a href={buyUrl} class="pdp__buy" target="_blank" rel="noopener noreferrer">
+          Buy now
+        </a>
+        <button
+          type="button"
+          class="pdp__cart-btn"
+          data-add-to-cart={product.productId}
+        >
+          Add to cart
+        </button>
+      </div>
+
+      {product.description && (
+        <div class="pdp__description">
+          <p>{product.description}</p>
+          {product.paragraphs?.map((p) => <p>{p}</p>)}
+        </div>
+      )}
+
+      {product.includes && product.includes.length > 0 && (
+        <div class="pdp__section">
+          <h2 class="pdp__section-title">What's included</h2>
+          <ul class="pdp__list">
+            {product.includes.map((item) => (
+              <li class="pdp__list-item">{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {product.topics && product.topics.length > 0 && (
+        <div class="pdp__section">
+          <h2 class="pdp__section-title">Topics covered</h2>
+          <ul class="pdp__list">
+            {product.topics.map((topic) => (
+              <li class="pdp__list-item">{topic}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {product.files && product.files.length > 0 && (
+        <div class="pdp__section">
+          <h2 class="pdp__section-title">Files</h2>
+          <div class="pdp__pills">
+            {product.files.map((file) => (
+              <span class="pdp__pill">{file}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </aside>
+  </article>
+
+  {otherProducts.length > 0 && (
+    <section class="related container" aria-labelledby="related-heading">
+      <h2 id="related-heading" class="related__title">Elsewhere in the store</h2>
+      <div class="related__grid">
+        {otherProducts.map((p) => (
+          <a href={getProductHref(p)} class="related__item">
+            <img
+              src={p.image}
+              alt={p.title}
+              width={p.width}
+              height={p.height}
+              loading="lazy"
+              decoding="async"
+              class="related__img"
+            />
+            <span class="related__name">{p.title}</span>
+            <span class="related__price">{p.price}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+</BaseLayout>
+
+<script>
+  import { addToCart } from "../../lib/store-cart";
+
+  function initPdp() {
+    document.querySelectorAll<HTMLButtonElement>("[data-add-to-cart]").forEach((btn) => {
+      if (btn.hasAttribute("data-pdp-bound")) return;
+      btn.setAttribute("data-pdp-bound", "");
+      btn.addEventListener("click", () => {
+        const productId = btn.getAttribute("data-add-to-cart");
+        if (!productId) return;
+        addToCart(productId);
+        btn.innerHTML = 'Added · <a href="/store/cart" style="color:var(--link)">View cart →</a>';
+        btn.disabled = true;
+        btn.classList.add("pdp__cart-btn--added");
+      });
+    });
+  }
+
+  function initCarousel() {
+    document.querySelectorAll<HTMLElement>(".carousel").forEach((carousel) => {
+      if (carousel.hasAttribute("data-carousel-bound")) return;
+      carousel.setAttribute("data-carousel-bound", "");
+
+      const track = carousel.querySelector<HTMLElement>(".carousel__track");
+      const slides = carousel.querySelectorAll<HTMLElement>(".carousel__slide");
+      const prevBtn = carousel.querySelector<HTMLButtonElement>("[data-carousel-prev]");
+      const nextBtn = carousel.querySelector<HTMLButtonElement>("[data-carousel-next]");
+      const dots = carousel.querySelectorAll<HTMLButtonElement>("[data-carousel-dot]");
+      if (!track || slides.length < 2) return;
+
+      let currentIndex = 0;
+
+      function updateState() {
+        if (prevBtn) prevBtn.disabled = currentIndex === 0;
+        if (nextBtn) nextBtn.disabled = currentIndex === slides.length - 1;
+        dots.forEach((dot, i) => {
+          dot.classList.toggle("carousel__dot--active", i === currentIndex);
+        });
+      }
+
+      function goTo(index: number) {
+        currentIndex = Math.max(0, Math.min(index, slides.length - 1));
+        track!.style.transform = `translateX(-${currentIndex * 100}%)`;
+        updateState();
+      }
+
+      prevBtn?.addEventListener("click", () => goTo(currentIndex - 1));
+      nextBtn?.addEventListener("click", () => goTo(currentIndex + 1));
+      dots.forEach((dot) => {
+        dot.addEventListener("click", () => {
+          const i = Number(dot.getAttribute("data-carousel-dot"));
+          if (!isNaN(i)) goTo(i);
+        });
+      });
+
+      carousel.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") goTo(currentIndex - 1);
+        if (e.key === "ArrowRight") goTo(currentIndex + 1);
+      });
+    });
+  }
+
+  initPdp();
+  initCarousel();
+  document.addEventListener("astro:page-load", () => { initPdp(); initCarousel(); });
+</script>
+
+<style>
+  .container {
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 var(--px);
+  }
+
+  .pdp {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 3rem;
+    padding-top: clamp(2rem, 4vw, 3rem);
+    padding-bottom: 2rem;
+  }
+
+  .pdp__images {
+    min-width: 0;
+  }
+
+  .pdp__hero {
+    margin: 0;
+  }
+
+  .pdp__hero-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: zoom-in;
+  }
+
+  .pdp__sidebar {
+    position: sticky;
+    top: 6rem;
+    align-self: start;
+    min-width: 20rem;
+  }
+
+  .pdp__breadcrumb {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+  }
+
+  .pdp__breadcrumb-link {
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+
+  .pdp__breadcrumb-link:hover {
+    color: var(--text);
+  }
+
+  .pdp__breadcrumb-sep {
+    margin: 0 0.4rem;
+    opacity: 0.5;
+  }
+
+  .pdp__breadcrumb-current {
+    color: var(--text-dim);
+  }
+
+  .pdp__title {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.2;
+  }
+
+  .pdp__tagline {
+    margin: 0.4rem 0 0;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .pdp__price-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .pdp__price {
+    font-family: var(--font-ui);
+    font-size: 1.25rem;
+    font-weight: 400;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pdp__format {
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  .pdp__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .pdp__buy {
+    display: block;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    background: var(--accent);
+    color: #121616;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  .pdp__buy:hover {
+    background: color-mix(in srgb, var(--accent) 92%, white);
+  }
+
+  .pdp__buy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .pdp__cart-btn {
+    display: block;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition:
+      color 0.3s ease,
+      border-color 0.3s ease;
+  }
+
+  .pdp__cart-btn:hover {
+    color: var(--text);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .pdp__cart-btn--added {
+    color: var(--link);
+    border-color: rgba(255, 255, 255, 0.12);
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: default;
+  }
+
+  .pdp__cart-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .pdp__description {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .pdp__description p {
+    margin: 0 0 0.75rem;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    line-height: 1.625;
+  }
+
+  .pdp__description p:last-child {
+    margin-bottom: 0;
+  }
+
+  .pdp__section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .pdp__section-title {
+    margin: 0 0 1rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .pdp__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .pdp__list-item {
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    line-height: 1.625;
+    color: var(--text);
+    padding: 0.15rem 0;
+  }
+
+  .pdp__list-item::before {
+    content: "-";
+    color: var(--text-dim);
+    margin-right: 0.5rem;
+  }
+
+  .pdp__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .pdp__pill {
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  /* Related products */
+  .related {
+    margin-top: 3rem;
+    padding-top: 2.5rem;
+    padding-bottom: 3rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .related__title {
+    margin: 0 0 1.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .related__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .related__item {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .related__item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .related__img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    will-change: transform;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .related__item:hover .related__img {
+      transform: scale(1.04);
+    }
+  }
+
+  .related__name {
+    margin-top: 0.5rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .related__price {
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Carousel */
+  .carousel {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .carousel__track {
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .carousel__slide {
+    flex: 0 0 100%;
+    margin: 0;
+  }
+
+  .carousel__img {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 80vh;
+    object-fit: contain;
+  }
+
+  .carousel__control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text);
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+  }
+
+  .carousel__control:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .carousel__control--prev {
+    left: 0.75rem;
+  }
+
+  .carousel__control--next {
+    right: 0.75rem;
+  }
+
+  .carousel__dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .carousel__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.3s ease;
+  }
+
+  .carousel__dot--active {
+    opacity: 1;
+    background: var(--text);
+  }
+
+
+  @media (max-width: 767px) {
+    .pdp {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .pdp__sidebar {
+      position: static;
+      min-width: 0;
+    }
+
+    .pdp__title {
+      font-size: 1.5rem;
+    }
+
+    .related__grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+</style>

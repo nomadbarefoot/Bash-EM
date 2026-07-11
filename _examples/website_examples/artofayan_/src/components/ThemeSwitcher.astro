@@ -1,0 +1,77 @@
+---
+import { themePresets, defaultThemeId } from "../config/theme";
+const presetsJson = JSON.stringify(themePresets);
+---
+
+<div class="theme-switcher">
+  <label for="theme-select" class="theme-switcher__label">Theme</label>
+  <select id="theme-select" class="theme-switcher__select" aria-label="Switch theme">
+    {themePresets.map((p) => (
+      <option value={p.id}>{p.name}</option>
+    ))}
+  </select>
+</div>
+
+<script>
+  const PRESETS: Record<string, Record<string, string>> = {
+    light: {"--bg":"#f4ede3","--text":"#4a3421","--accent":"#ea6735","--border":"#e5dac9","--border-lighter":"#f0e9de","--subtitle":"#626262","--link":"#446464"},
+    dark: {"--bg":"#202727","--text":"#e0ddd8","--accent":"#E46680","--border":"rgba(255,255,255,0.12)","--border-lighter":"#2a3232","--subtitle":"#9a9590","--link":"#8ab4b4"},
+  };
+  const SK = "artofayan-theme";
+
+  function applyTheme(id: string) {
+    const tokens = PRESETS[id];
+    if (!tokens) return;
+    const root = document.documentElement;
+    for (const [key, value] of Object.entries(tokens)) {
+      root.style.setProperty(key, value);
+    }
+    root.setAttribute("data-theme", id);
+    try { localStorage.setItem(SK, id); } catch {}
+  }
+
+  function syncSelect() {
+    const select = document.getElementById("theme-select") as HTMLSelectElement | null;
+    if (!select) return;
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(SK); } catch {}
+    const activeId = saved && PRESETS[saved] ? saved : "light";
+    select.value = activeId;
+    select.removeEventListener("change", onSelectChange);
+    select.addEventListener("change", onSelectChange);
+  }
+
+  function onSelectChange(e: Event) {
+    const select = e.target as HTMLSelectElement;
+    applyTheme(select.value);
+  }
+
+  syncSelect();
+  document.addEventListener("astro:after-swap", syncSelect);
+</script>
+
+<style>
+  .theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .theme-switcher__label {
+    font-size: 0.7rem;
+    color: var(--text);
+    opacity: 0.7;
+  }
+  .theme-switcher__select {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .theme-switcher__select:focus {
+    border-color: var(--accent);
+    outline: none;
+  }
+</style>

@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Art of Ayan - Contact" description="Get in touch with Ayan Nag.">
+  <div class="contact">
+    <h1 class="contact__title">Contact</h1>
+    <p class="contact__text">
+      For commissions, freelance work, or any inquiries, please reach out via email:
+    </p>
+    <a href="mailto:contact@artofayan.com" class="contact__email">contact@artofayan.com</a>
+    <p class="contact__text">I typically respond within 3–5 days.</p>
+  </div>
+</BaseLayout>
+<style>
+  .contact {
+    max-width: 480px;
+    margin: 2rem auto;
+    text-align: center;
+  }
+  .contact__title {
+    font-family: var(--font-ui);
+    font-size: 1.4rem;
+    font-weight: 400;
+    margin: 0 0 1rem;
+  }
+  .contact__text {
+    font-size: 0.83rem;
+    line-height: 1.7;
+    margin: 0 0 1rem;
+  }
+  .contact__email {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    background: var(--accent);
+    color: #f4f1ec;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.83rem;
+    margin-bottom: 1rem;
+  }
+  .contact__email:hover {
+    opacity: 0.9;
+    color: #f4f1ec;
+  }
+</style>

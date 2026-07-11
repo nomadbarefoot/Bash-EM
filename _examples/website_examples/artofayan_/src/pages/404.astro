@@ -1,0 +1,44 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Page Not Found — Ayan Nag" description="The page you're looking for doesn't exist.">
+  <div class="not-found">
+    <h1 class="not-found__title">404</h1>
+    <p class="not-found__text">This page doesn't exist.</p>
+    <nav class="not-found__nav">
+      <a href="/" class="not-found__link">Portfolio</a>
+      <span aria-hidden="true"> · </span>
+      <a href="/about" class="not-found__link">About</a>
+    </nav>
+  </div>
+</BaseLayout>
+<style>
+  .not-found {
+    min-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .not-found__title {
+    font-family: var(--font-ui);
+    font-size: clamp(4rem, 15vw, 8rem);
+    margin: 0 0 0.5rem;
+    opacity: 0.12;
+    line-height: 1;
+  }
+  .not-found__text {
+    font-size: 0.83rem;
+    margin: 0 0 1.5rem;
+    color: var(--subtitle);
+  }
+  .not-found__link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.78rem;
+  }
+  .not-found__link:hover {
+    text-decoration: underline;
+  }
+</style>

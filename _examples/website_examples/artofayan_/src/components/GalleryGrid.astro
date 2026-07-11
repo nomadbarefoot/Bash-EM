@@ -1,0 +1,278 @@
+---
+import ImageCard from "./ImageCard.astro";
+import { getCategoryLabel } from "../utils/categories";
+import type { CollectionEntry } from "astro:content";
+import sharp from "sharp";
+import path from "node:path";
+
+interface Props {
+  projects: CollectionEntry<"projects">[];
+  galleryId?: string;
+  showFilters?: boolean;
+}
+
+const { projects, galleryId = "portfolio-grid", showFilters = false } = Astro.props;
+
+function slugFromId(id: string): string {
+  return id.endsWith(".md") ? id.slice(0, -3) : id;
+}
+
+async function getImagePixelSize(src: string): Promise<{ width: number; height: number }> {
+  const relative = src.replace(/^\//, "");
+  const imagePath = path.join(process.cwd(), "public", relative);
+  try {
+    const metadata = await sharp(imagePath).metadata();
+    return {
+      width: metadata.width ?? 1600,
+      height: metadata.height ?? 900,
+    };
+  } catch {
+    return { width: 1600, height: 900 };
+  }
+}
+
+// Extract dimensions for Justified Flex layout + per-slide sizes for PhotoSwipe
+const projectsWithDimensions = await Promise.all(
+  projects.map(async (entry) => {
+    const { cover, images, coverPosition, categories } = entry.data;
+    const coverPath = path.join(process.cwd(), "public", cover);
+    let width = 1200;
+    let height = 800;
+
+    try {
+      const metadata = await sharp(coverPath).metadata();
+      width = metadata.width || 1200;
+      height = metadata.height || 800;
+    } catch (e) {
+      console.warn(`Could not read dimensions for ${coverPath}`);
+    }
+
+    const imageList = [cover, ...(images ?? []).filter((img) => img !== cover)];
+    const gallerySlides = await Promise.all(
+      imageList.map(async (src) => {
+        const { width: w, height: h } = await getImagePixelSize(src);
+        return { src, width: w, height: h };
+      })
+    );
+
+    return {
+      ...entry,
+      dimensions: { width, height, ratio: width / height },
+      gallerySlides,
+      coverPosition: coverPosition ?? null,
+      allCategories: categories ?? [],
+    };
+  })
+);
+---
+
+<div id={galleryId} class="gallery-grid">
+  {projectsWithDimensions.map((entry, i) => {
+    const { title, category, cover } = entry.data;
+    const { width, height, ratio } = entry.dimensions;
+    const { gallerySlides, coverPosition: entryPosition, allCategories } = entry;
+    const slug = slugFromId(entry.id);
+    const seriesUrl = `/series/${slug}`;
+    const prevProject = i > 0 ? projectsWithDimensions[i - 1] : null;
+    const nextProject = i < projectsWithDimensions.length - 1 ? projectsWithDimensions[i + 1] : null;
+    return (
+      <a
+        href={seriesUrl}
+        data-series-url={seriesUrl}
+        data-gallery-slides={encodeURIComponent(JSON.stringify(gallerySlides))}
+        data-gallery-title={title}
+        data-gallery-category={getCategoryLabel(category)}
+        data-prev-slug={prevProject ? slugFromId(prevProject.id) : undefined}
+        data-next-slug={nextProject ? slugFromId(nextProject.id) : undefined}
+        data-prev-title={prevProject?.data.title ?? undefined}
+        data-next-title={nextProject?.data.title ?? undefined}
+        class="gallery-grid__item"
+        data-category={category}
+        data-categories={[category, ...allCategories].join(",")}
+        style={`--ratio: ${ratio};`}
+      >
+        <ImageCard
+          src={cover}
+          alt={title}
+          title={title}
+          category={getCategoryLabel(category)}
+          width={width}
+          height={height}
+          objectPosition={entryPosition ?? undefined}
+        />
+      </a>
+    );
+  })}
+  <!-- Last row stretch prevention shim -->
+  <div class="gallery-grid__shim"></div>
+</div>
+
+{showFilters && (
+  <script is:inline>
+    (function () {
+      var BOUND_ATTR = "data-filter-bound";
+
+      function getFilterFromUrl() {
+        var params = new URLSearchParams(window.location.search);
+        return params.get("filter") || "portfolio";
+      }
+
+      function normalizeFilter(filter) {
+        var requested = filter || "portfolio";
+        var btn = document.querySelector('.catbar__link[data-filter="' + requested + '"]');
+        return btn ? requested : "portfolio";
+      }
+
+      function syncUrl(filter) {
+        if (window.location.pathname !== "/") return;
+        var url = new URL(window.location.href);
+        if (filter === "portfolio") {
+          url.searchParams.delete("filter");
+        } else {
+          url.searchParams.set("filter", filter);
+        }
+        var next = url.pathname + url.search + url.hash;
+        window.history.replaceState({}, "", next);
+      }
+
+      function applyFilter(filter, options) {
+        var activeFilter = normalizeFilter(filter);
+        var shouldSyncUrl = !options || options.syncUrl !== false;
+        var shouldAnimate = !options || options.animate !== false;
+
+        document.querySelectorAll(".catbar__link").forEach(function (btn) {
+          btn.classList.toggle(
+            "catbar__link--active",
+            btn.getAttribute("data-filter") === activeFilter
+          );
+        });
+        var activeBtn = document.querySelector('.catbar__link[data-filter="' + activeFilter + '"]');
+        if (activeBtn) {
+          activeBtn.scrollIntoView({
+            block: "nearest",
+            inline: "center",
+            behavior: shouldSyncUrl ? "smooth" : "auto",
+          });
+        }
+
+        document.querySelectorAll(".gallery-grid__item").forEach(function (card) {
+          var cats = (card.getAttribute("data-categories") || "").split(",");
+          var show = activeFilter === "portfolio" || cats.indexOf(activeFilter) !== -1;
+          if (show) {
+            card.style.display = "";
+            if (shouldAnimate) {
+              requestAnimationFrame(function () {
+                card.classList.add("gallery-grid__item--entering");
+                card.addEventListener(
+                  "animationend",
+                  function () {
+                    card.classList.remove("gallery-grid__item--entering");
+                  },
+                  { once: true }
+                );
+              });
+            } else {
+              card.classList.remove("gallery-grid__item--entering");
+            }
+          } else {
+            card.style.display = "none";
+          }
+        });
+
+        if (shouldSyncUrl) syncUrl(activeFilter);
+      }
+
+      function initFilters() {
+        document.querySelectorAll(".catbar__link").forEach(function (btn) {
+          if (btn.getAttribute(BOUND_ATTR) === "true") return;
+          btn.setAttribute(BOUND_ATTR, "true");
+          btn.addEventListener("click", function () {
+            var filter = btn.getAttribute("data-filter");
+            applyFilter(filter, { syncUrl: true, animate: true });
+          });
+        });
+        applyFilter(getFilterFromUrl(), { syncUrl: false, animate: false });
+      }
+      initFilters();
+      document.addEventListener("astro:page-load", initFilters);
+      document.addEventListener("astro:after-swap", initFilters);
+      window.addEventListener("popstate", function () {
+        applyFilter(getFilterFromUrl(), { syncUrl: false, animate: false });
+      });
+    })();
+  </script>
+)}
+
+<script>
+  import "photoswipe/style.css";
+  import { openProjectLightbox } from "../lib/lightbox.ts";
+
+  const BOUND_ATTR = "data-lightbox-bound";
+
+  function init() {
+    const grid = document.querySelector(".gallery-grid");
+    if (!grid) return;
+    grid.querySelectorAll<HTMLAnchorElement>("a.gallery-grid__item").forEach((card) => {
+      if (card.getAttribute(BOUND_ATTR) === "true") return;
+      card.setAttribute(BOUND_ATTR, "true");
+      card.addEventListener("click", (e) => {
+        e.preventDefault();
+        card.blur();
+        const slug = (card.getAttribute("data-series-url") ?? "").replace("/series/", "");
+        if (slug) openProjectLightbox(slug);
+      });
+    });
+  }
+
+  init();
+  document.addEventListener("astro:page-load", init);
+</script>
+
+<style>
+  .gallery-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px; /* Tight mosaic glove-fit */
+    padding: 0 12px; /* Subtle break from window edge */
+  }
+  .gallery-grid__item {
+    display: block;
+    position: relative;
+    flex-grow: var(--ratio);
+    flex-shrink: var(--ratio);
+    flex-basis: calc(var(--ratio) * 280px); /* Slightly larger base */
+    height: 280px; 
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.3s ease;
+  }
+  @media (min-width: 1440px) {
+    .gallery-grid__item {
+      height: 380px; /* Expansive desktop previews */
+      flex-basis: calc(var(--ratio) * 380px);
+    }
+  }
+  @media (max-width: 768px) {
+    .gallery-grid__item {
+      height: 200px; /* Better mobile balance */
+      flex-basis: calc(var(--ratio) * 200px);
+    }
+  }
+  .gallery-grid__shim {
+    flex-grow: 99999;
+  }
+  @keyframes gallery-item-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .gallery-grid__item--entering {
+    animation: gallery-item-enter 0.25s ease forwards;
+  }
+</style>
