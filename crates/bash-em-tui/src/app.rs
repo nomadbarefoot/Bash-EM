@@ -85,6 +85,14 @@ pub struct RunRow {
     pub root: PathBuf,
 }
 
+pub struct BrowseEntry {
+    pub path: PathBuf,
+    pub is_dir: bool,
+    pub category: String,
+    pub artifact_count: usize,
+    pub depth: usize,
+}
+
 pub struct App {
     pub screen: Screen,
     pub focused_pane: Pane,
@@ -117,6 +125,12 @@ pub struct App {
 
     pub addon: Option<Box<dyn Addon>>,
     pub addon_focused: bool,
+
+    pub pending_restore: Option<String>,
+
+    pub browse_entries: Vec<BrowseEntry>,
+    pub browse_selected: usize,
+    pub browse_offset: usize,
 }
 
 impl App {
@@ -155,6 +169,10 @@ impl App {
             confirm: ConfirmDialog::None,
             addon: None,
             addon_focused: false,
+            pending_restore: None,
+            browse_entries: Vec::new(),
+            browse_selected: 0,
+            browse_offset: 0,
         }
     }
 
@@ -193,6 +211,9 @@ impl App {
             Screen::Backups => Pane::RunsTable,
             Screen::Profiles => Pane::ProfileEditor,
         };
+        if screen == Screen::Scan && self.scan_phase == ScanPhase::Idle {
+            self.scan_phase = ScanPhase::Scanning;
+        }
     }
 
     pub fn cycle_pane(&mut self) {

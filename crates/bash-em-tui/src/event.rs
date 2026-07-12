@@ -44,6 +44,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Welcome => handle_welcome_key(app, key),
         Screen::Scan => handle_scan_key(app, key),
         Screen::Backups => handle_backups_key(app, key),
+        Screen::Browse => handle_browse_key(app, key),
         _ => {}
     }
 }
@@ -72,7 +73,9 @@ fn handle_welcome_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Enter => {
             app.switch_screen(Screen::Scan);
-            app.scan_phase = ScanPhase::Scanning;
+            if app.scan_phase == ScanPhase::Idle {
+                app.scan_phase = ScanPhase::Scanning;
+            }
         }
         KeyCode::Char('b') => app.switch_screen(Screen::Browse),
         KeyCode::Char('t') => {
@@ -105,6 +108,23 @@ fn handle_scan_key(app: &mut App, key: KeyEvent) {
                         selected_button: 0,
                     };
                 }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn handle_browse_key(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if !app.browse_entries.is_empty() {
+                app.browse_selected = (app.browse_selected + 1) % app.browse_entries.len();
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            if !app.browse_entries.is_empty() {
+                app.browse_selected = app.browse_selected.checked_sub(1)
+                    .unwrap_or(app.browse_entries.len() - 1);
             }
         }
         _ => {}
@@ -160,7 +180,8 @@ fn handle_confirm_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Enter => {
             match &app.confirm {
-                ConfirmDialog::RestoreRun { selected_button: 0, .. } => {
+                ConfirmDialog::RestoreRun { run_id, selected_button: 0, .. } => {
+                    app.pending_restore = Some(run_id.clone());
                 }
                 ConfirmDialog::ApplyConfirm { selected_button: 0, .. } => {
                     app.scan_phase = ScanPhase::Applying;

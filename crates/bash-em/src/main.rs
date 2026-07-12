@@ -55,6 +55,12 @@ enum Commands {
         #[command(subcommand)]
         action: AdaptersAction,
     },
+    /// Launch interactive TUI
+    Tui {
+        path: Option<PathBuf>,
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -450,6 +456,17 @@ fn cmd_adapters_list() {
     }
 }
 
+fn cmd_tui(path: Option<PathBuf>, profile_path: Option<PathBuf>) {
+    let profile = load_profile_or_default(profile_path.as_ref());
+    let root = path.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let root = root.canonicalize().unwrap_or(root);
+    let app = bash_em_tui::app::App::new(root, profile);
+    if let Err(e) = bash_em_tui::run::run(app) {
+        eprintln!("{} TUI: {}", "error:".red().bold(), e);
+        std::process::exit(1);
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     match cli.command {
@@ -467,5 +484,6 @@ fn main() {
         Commands::Adapters { action } => match action {
             AdaptersAction::List => cmd_adapters_list(),
         },
+        Commands::Tui { path, profile } => cmd_tui(path, profile),
     }
 }
