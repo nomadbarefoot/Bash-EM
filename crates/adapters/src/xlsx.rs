@@ -1,6 +1,6 @@
-use std::path::Path;
-use std::io::{Read as IoRead, Write as IoWrite};
 use crate::adapter::{Adapter, FileCategory};
+use std::io::{Read as IoRead, Write as IoWrite};
+use std::path::Path;
 
 const XLSX_EXTENSIONS: &[&str] = &["xlsx"];
 
@@ -8,15 +8,15 @@ pub struct XlsxAdapter;
 
 impl XlsxAdapter {
     pub fn read_strings(path: &Path) -> Result<Vec<(String, String)>, String> {
-        let file = std::fs::File::open(path)
-            .map_err(|e| format!("open xlsx: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| format!("read xlsx zip: {}", e))?;
+        let file = std::fs::File::open(path).map_err(|e| format!("open xlsx: {}", e))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| format!("read xlsx zip: {}", e))?;
 
         let mut results = Vec::new();
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)
+            let mut entry = archive
+                .by_index(i)
                 .map_err(|e| format!("xlsx entry {}: {}", i, e))?;
 
             let name = entry.name().to_string();
@@ -28,7 +28,8 @@ impl XlsxAdapter {
             }
 
             let mut xml = String::new();
-            entry.read_to_string(&mut xml)
+            entry
+                .read_to_string(&mut xml)
                 .map_err(|e| format!("read xlsx xml: {}", e))?;
             results.push((name, xml));
         }
@@ -81,56 +82,67 @@ impl XlsxAdapter {
             .map(|(k, v)| (k.as_str(), v.as_slice()))
             .collect();
 
-        let file = std::fs::File::open(path)
-            .map_err(|e| format!("open xlsx: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| format!("read xlsx: {}", e))?;
+        let file = std::fs::File::open(path).map_err(|e| format!("open xlsx: {}", e))?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("read xlsx: {}", e))?;
 
         let tmp_path = path.with_extension("bashm_xlsx_tmp");
-        let tmp_file = std::fs::File::create(&tmp_path)
-            .map_err(|e| format!("create tmp xlsx: {}", e))?;
+        let tmp_file =
+            std::fs::File::create(&tmp_path).map_err(|e| format!("create tmp xlsx: {}", e))?;
         let mut writer = zip::ZipWriter::new(tmp_file);
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)
+            let mut entry = archive
+                .by_index(i)
                 .map_err(|e| format!("xlsx entry {}: {}", i, e))?;
 
             let name = entry.name().to_string();
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(entry.compression());
+            let options =
+                zip::write::SimpleFileOptions::default().compression_method(entry.compression());
 
-            writer.start_file(&name, options)
+            writer
+                .start_file(&name, options)
                 .map_err(|e| format!("write xlsx entry {}: {}", name, e))?;
 
             let mut buf = Vec::new();
-            entry.read_to_end(&mut buf)
+            entry
+                .read_to_end(&mut buf)
                 .map_err(|e| format!("read xlsx entry: {}", e))?;
 
             if let Some(repls) = replace_map.get(name.as_str()) {
-                let xml = String::from_utf8(buf)
-                    .map_err(|_| format!("non-utf8 xml in {}", name))?;
+                let xml =
+                    String::from_utf8(buf).map_err(|_| format!("non-utf8 xml in {}", name))?;
                 let modified = Self::replace_text_in_xml(&xml, repls);
-                writer.write_all(modified.as_bytes())
+                writer
+                    .write_all(modified.as_bytes())
                     .map_err(|e| format!("write xlsx xml: {}", e))?;
             } else {
-                writer.write_all(&buf)
+                writer
+                    .write_all(&buf)
                     .map_err(|e| format!("write xlsx entry: {}", e))?;
             }
         }
 
-        writer.finish()
+        writer
+            .finish()
             .map_err(|e| format!("finalize xlsx: {}", e))?;
-        std::fs::rename(&tmp_path, path)
-            .map_err(|e| format!("rename xlsx: {}", e))?;
+        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename xlsx: {}", e))?;
         Ok(())
     }
 }
 
 impl Adapter for XlsxAdapter {
-    fn name(&self) -> &'static str { "xlsx" }
-    fn extensions(&self) -> &'static [&'static str] { XLSX_EXTENSIONS }
-    fn category(&self) -> FileCategory { FileCategory::Office }
-    fn can_write(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "xlsx"
+    }
+    fn extensions(&self) -> &'static [&'static str] {
+        XLSX_EXTENSIONS
+    }
+    fn category(&self) -> FileCategory {
+        FileCategory::Office
+    }
+    fn can_write(&self) -> bool {
+        true
+    }
 
     fn probe(&self, _path: &Path, first_bytes: &[u8]) -> bool {
         first_bytes.len() >= 4 && first_bytes[..4] == [0x50, 0x4B, 0x03, 0x04]

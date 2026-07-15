@@ -1,5 +1,5 @@
+use crate::replacer::{fix_content_with_options, Counts, FixOptions, LineChange};
 use std::path::PathBuf;
-use crate::replacer::{Counts, LineChange, fix_content_with_options, FixOptions};
 
 #[derive(Debug, Clone)]
 pub struct TextUnit {
@@ -43,7 +43,11 @@ impl Pipeline {
     }
 
     pub fn with_options(preview_cap: usize, options: FixOptions, fence_guard: bool) -> Self {
-        Self { preview_cap, options, fence_guard }
+        Self {
+            preview_cap,
+            options,
+            fence_guard,
+        }
     }
 
     fn should_fence_guard(&self, path: &std::path::Path) -> bool {
@@ -80,7 +84,10 @@ impl Pipeline {
                 edits.push(file_edits);
             }
         }
-        BatchEdits { files: edits, totals }
+        BatchEdits {
+            files: edits,
+            totals,
+        }
     }
 }
 

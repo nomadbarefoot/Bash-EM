@@ -45,7 +45,11 @@ impl Default for Theme {
 impl Theme {
     pub fn panel_block<'a>(&self, title: &'a str, focused: bool) -> Block<'a> {
         let border_color = if focused { self.focus } else { self.border };
-        let border_type = if focused { BorderType::Double } else { BorderType::Plain };
+        let border_type = if focused {
+            BorderType::Double
+        } else {
+            BorderType::Plain
+        };
         Block::bordered()
             .title(title)
             .border_style(Style::default().fg(border_color))

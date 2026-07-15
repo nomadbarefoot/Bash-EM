@@ -28,9 +28,9 @@ This started as a PoC ratatui scanner for dashes. The product is the grown-up ve
 | Apply | In-place replace via adapters (atomic writes) |
 | Backup / restore | Snapshot originals before mutate; restore by run |
 | Diff / report | Before/after hunks, logs, optional machine-readable export |
-| Profiles | YAML-defined rule sets + prefs; editable in TUI or on disk |
+| Profiles | Per-root `.bash-em.yaml`, explicit overrides, and atomic TUI save/reload |
 | Hub UI | Welcome, directory browse, health bar, history, settings |
-| Add-ons | Optional play modules (e.g. Tetris) — never in the engine |
+| Add-ons | Roadmap play modules (e.g. Tetris) — never in the engine |
 
 **Not in scope (v1 product promise):** OCR on scanned PDFs, cloud sync, auto-commit to git, "rewrite my essay to sound human."
 
@@ -45,7 +45,8 @@ bash-em-engine      rules + pipeline (find → replace spans)
 bash-em-backup      snapshots / restore (core system)
 bash-em-diff        hunks / reports (core system)
 bash-em-config      YAML profiles, prefs, ignore
-bash-em-adapters    text, pdf (text-only), xlsx, docx, …
+bash-em-adapters    active text I/O; structured adapters stay dormant until proven
+bash-em-workflow    shared scan → preview → backup → apply / restore orchestration
 bash-em-tui         hub + review + mouse (consumes core)
 bash-em-addon-*     toys (Tetris, etc.)
 bash-em             binary composition root + CLI
@@ -59,17 +60,17 @@ See phase docs for how this lands over time.
 
 ---
 
-## Supported content (product intent)
+## Supported content
 
 | Category | Examples | Notes |
 |----------|----------|-------|
-| Text / docs | `.md`, `.txt`, `.rst`, `.tex` | Primary path |
-| Code | `.rs`, `.ts`, `.js`, `.py`, … | Fence / string awareness via rules |
-| Web assets | `.html`, `.css`, `.astro`, … | Entities + text nodes |
-| Office | `.xlsx`, `.docx`, `.odt` | Structured adapters |
-| PDF | `.pdf` | **Text PDFs only — no OCR** |
+| Text / docs | `.md`, `.txt`, `.rst`, `.tex` | Active UTF-8 text path |
+| Code | `.rs`, `.ts`, `.js`, `.py`, … | Active UTF-8 text path; fence guard for Markdown/Astro |
+| Web assets | `.html`, `.css`, `.astro`, … | Active UTF-8 text path |
+| Office | `.xlsx`, `.docx`, `.odt` | Roadmap; dormant adapters are not registered |
+| PDF | `.pdf` | Roadmap; no OCR and no write support in the MVP |
 
-File categories feed the **directory health bar** on the welcome screen (artifact load + mix of text / code / web / docs / office / pdf).
+Active text categories feed the directory health report. Structured-format categories return only after their adapters are integrated end to end.
 
 ---
 

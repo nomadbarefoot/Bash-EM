@@ -9,18 +9,27 @@ pub struct VScrollState {
 
 impl VScrollState {
     pub fn new() -> Self {
-        Self { selected: 0, offset: 0, viewport_height: 0, total_items: 0 }
+        Self {
+            selected: 0,
+            offset: 0,
+            viewport_height: 0,
+            total_items: 0,
+        }
     }
 
     pub fn move_selection(&mut self, delta: i64) {
-        if self.total_items == 0 { return; }
+        if self.total_items == 0 {
+            return;
+        }
         let cur = self.selected as i64;
         self.selected = (cur + delta).rem_euclid(self.total_items as i64) as usize;
         self.ensure_visible();
     }
 
     pub fn ensure_visible(&mut self) {
-        if self.viewport_height == 0 { return; }
+        if self.viewport_height == 0 {
+            return;
+        }
         if self.selected < self.offset {
             self.offset = self.selected;
         } else if self.selected >= self.offset + self.viewport_height {

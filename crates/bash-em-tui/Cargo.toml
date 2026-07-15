@@ -10,9 +10,7 @@ tetris = []
 [dependencies]
 engine = { path = "../engine", features = ["serde"] }
 config = { path = "../config" }
-diff = { path = "../diff" }
-backup = { path = "../backup" }
-adapters = { path = "../adapters" }
+workflow = { path = "../workflow" }
 ratatui = "0.29"
 crossterm = { version = "0.28", features = ["event-stream"] }
-serde_yaml = "0.9"
+dirs = "6"

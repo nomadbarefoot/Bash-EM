@@ -1,0 +1,11 @@
+[package]
+name = "workflow"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+engine = { path = "../engine", features = ["serde"] }
+config = { path = "../config" }
+adapters = { path = "../adapters" }
+backup = { path = "../backup" }
+sha2 = "0.10"

@@ -1,5 +1,5 @@
-use std::ops::Range;
 use crate::replacer::fix_line;
+use std::ops::Range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RuleId {

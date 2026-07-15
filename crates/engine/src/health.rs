@@ -1,7 +1,7 @@
+use crate::boilerplate::BoilerplateReport;
+use crate::replacer::Counts;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::replacer::Counts;
-use crate::boilerplate::BoilerplateReport;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -45,8 +45,14 @@ impl CorruptionBreakdown {
     }
 
     pub fn total(&self) -> usize {
-        self.em_dash + self.en_dash + self.horizontal_bar + self.html_entities
-            + self.curly_quotes + self.ellipsis + self.zero_width + self.llm_flags
+        self.em_dash
+            + self.en_dash
+            + self.horizontal_bar
+            + self.html_entities
+            + self.curly_quotes
+            + self.ellipsis
+            + self.zero_width
+            + self.llm_flags
     }
 }
 
@@ -63,6 +69,7 @@ pub struct HealthReport {
     pub root: PathBuf,
     pub scanned: usize,
     pub skipped: usize,
+    pub dirty_files: usize,
     pub corruption: CorruptionBreakdown,
     pub by_category: HashMap<String, CategoryStats>,
     pub top_files: Vec<(PathBuf, usize)>,
@@ -75,6 +82,7 @@ impl HealthReport {
             root,
             scanned,
             skipped,
+            dirty_files: 0,
             corruption: CorruptionBreakdown::default(),
             by_category: HashMap::new(),
             top_files: Vec::new(),
@@ -83,9 +91,24 @@ impl HealthReport {
     }
 
     pub fn add_file(&mut self, path: PathBuf, counts: &Counts, category: &str) {
+        self.add_file_with_boilerplate(path, counts, category, None);
+    }
+
+    pub fn add_file_with_boilerplate(
+        &mut self,
+        path: PathBuf,
+        counts: &Counts,
+        category: &str,
+        boilerplate: Option<&BoilerplateReport>,
+    ) {
         self.corruption.add_counts(counts);
-        let total = counts.total();
+        let llm_flags = boilerplate.map_or(0, |report| report.matches.len());
+        if let Some(report) = boilerplate {
+            self.corruption.add_boilerplate(report);
+        }
+        let total = counts.total() + llm_flags;
         if total > 0 {
+            self.dirty_files += 1;
             self.top_files.push((path, total));
         }
         let cat = self.by_category.entry(category.to_string()).or_default();
@@ -100,8 +123,10 @@ impl HealthReport {
     pub fn finalize(&mut self) {
         self.top_files.sort_by(|a, b| b.1.cmp(&a.1));
         self.top_files.truncate(20);
-        let total = self.corruption.total();
-        self.score = std::cmp::min(100, (total * 100) / std::cmp::max(self.scanned, 1)) as u8;
+        self.score = std::cmp::min(
+            100,
+            (self.dirty_files * 100) / std::cmp::max(self.scanned, 1),
+        ) as u8;
     }
 }
 
@@ -119,8 +144,13 @@ mod tests {
     #[test]
     fn score_scales_with_density() {
         let mut r = HealthReport::new("/tmp".into(), 100, 0);
-        let counts = Counts { em: 50, ..Default::default() };
-        r.add_file("a.md".into(), &counts, "text");
+        let counts = Counts {
+            em: 1,
+            ..Default::default()
+        };
+        for i in 0..50 {
+            r.add_file(format!("{i}.md").into(), &counts, "text");
+        }
         r.finalize();
         assert_eq!(r.score, 50);
     }
@@ -128,7 +158,11 @@ mod tests {
     #[test]
     fn corruption_breakdown_tracks_types() {
         let mut r = HealthReport::new("/tmp".into(), 10, 0);
-        let counts = Counts { em: 3, curly_quotes: 2, ..Default::default() };
+        let counts = Counts {
+            em: 3,
+            curly_quotes: 2,
+            ..Default::default()
+        };
         r.add_file("a.md".into(), &counts, "text");
         r.finalize();
         assert_eq!(r.corruption.em_dash, 3);
@@ -137,10 +171,32 @@ mod tests {
     }
 
     #[test]
+    fn boilerplate_flags_contribute_to_file_health() {
+        let mut report = HealthReport::new("/tmp".into(), 1, 0);
+        let boilerplate = crate::boilerplate::scan_content("As an AI assistant, I can help.");
+        report.add_file_with_boilerplate(
+            "a.md".into(),
+            &Counts::default(),
+            "text",
+            Some(&boilerplate),
+        );
+        report.finalize();
+
+        assert_eq!(report.corruption.llm_flags, 1);
+        assert_eq!(report.dirty_files, 1);
+        assert_eq!(report.score, 100);
+        assert_eq!(report.top_files, vec![(PathBuf::from("a.md"), 1)]);
+        assert_eq!(report.by_category["text"].artifact_count, 1);
+    }
+
+    #[test]
     fn top_files_sorted_and_truncated() {
         let mut r = HealthReport::new("/tmp".into(), 100, 0);
         for i in 0..30 {
-            let counts = Counts { em: i, ..Default::default() };
+            let counts = Counts {
+                em: i,
+                ..Default::default()
+            };
             r.add_file(format!("{}.md", i).into(), &counts, "text");
         }
         r.finalize();

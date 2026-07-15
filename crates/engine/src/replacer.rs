@@ -12,8 +12,13 @@ pub struct Counts {
 
 impl Counts {
     pub fn total(&self) -> usize {
-        self.em + self.en + self.bar + self.entities
-            + self.curly_quotes + self.ellipsis + self.zero_width
+        self.em
+            + self.en
+            + self.bar
+            + self.entities
+            + self.curly_quotes
+            + self.ellipsis
+            + self.zero_width
     }
 
     pub fn replaceable(&self) -> usize {
@@ -111,8 +116,47 @@ pub fn decode_entities(line: &str, counts: &mut Counts) -> String {
     out
 }
 
-fn is_wide_dash(c: char) -> bool {
-    c == '\u{2014}' || c == '\u{2015}'
+const ENTITY_EM_MARKER: char = '\u{E000}';
+const ENTITY_EN_MARKER: char = '\u{E001}';
+const ENTITY_BAR_MARKER: char = '\u{E002}';
+
+fn decode_entities_for_fix(line: &str, counts: &mut Counts) -> String {
+    const ENTITIES: &[(&str, char)] = &[
+        ("&mdash;", ENTITY_EM_MARKER),
+        ("&#8212;", ENTITY_EM_MARKER),
+        ("&#x2014;", ENTITY_EM_MARKER),
+        ("&#X2014;", ENTITY_EM_MARKER),
+        ("&ndash;", ENTITY_EN_MARKER),
+        ("&#8211;", ENTITY_EN_MARKER),
+        ("&#x2013;", ENTITY_EN_MARKER),
+        ("&#X2013;", ENTITY_EN_MARKER),
+        ("&horbar;", ENTITY_BAR_MARKER),
+        ("&#8213;", ENTITY_BAR_MARKER),
+        ("&#x2015;", ENTITY_BAR_MARKER),
+    ];
+
+    if !line.contains('&') {
+        return line.to_string();
+    }
+
+    let mut out = line.to_string();
+    for (entity, marker) in ENTITIES {
+        let found = out.matches(entity).count();
+        if found > 0 {
+            counts.entities += found;
+            out = out.replace(entity, &marker.to_string());
+        }
+    }
+    out
+}
+
+fn is_enabled_wide_dash(c: char, opts: &FixOptions) -> bool {
+    match c {
+        '\u{2014}' => opts.em_dash,
+        '\u{2015}' => opts.horizontal_bar,
+        ENTITY_EM_MARKER | ENTITY_BAR_MARKER => true,
+        _ => false,
+    }
 }
 
 fn is_zero_width(c: char) -> bool {
@@ -134,13 +178,14 @@ pub fn fix_line_with_options(line: &str, opts: &FixOptions) -> (String, Counts) 
     let mut counts = Counts::default();
 
     let line = if opts.html_entities {
-        decode_entities(line, &mut counts)
+        decode_entities_for_fix(line, &mut counts)
     } else {
         line.to_string()
     };
 
-    let needs_dashes = (opts.em_dash || opts.horizontal_bar || opts.en_dash)
-        && line.contains(|c: char| is_wide_dash(c) || c == '\u{2013}');
+    let needs_dashes = line.contains(|c: char| {
+        is_enabled_wide_dash(c, opts) || (opts.en_dash && c == '\u{2013}') || c == ENTITY_EN_MARKER
+    });
     let needs_quotes = opts.curly_quotes && line.contains(is_curly_quote);
     let needs_ellipsis = opts.ellipsis && line.contains('\u{2026}');
     let needs_zw = opts.zero_width && line.contains(is_zero_width);
@@ -154,8 +199,12 @@ pub fn fix_line_with_options(line: &str, opts: &FixOptions) -> (String, Counts) 
     let mut inserted_dash_at_end = false;
 
     while let Some(c) = chars.next() {
-        if is_wide_dash(c) && (opts.em_dash || opts.horizontal_bar) {
-            if c == '\u{2014}' { counts.em += 1 } else { counts.bar += 1 }
+        if is_enabled_wide_dash(c, opts) {
+            if c == '\u{2014}' {
+                counts.em += 1;
+            } else if c == '\u{2015}' {
+                counts.bar += 1;
+            }
 
             while out.ends_with(' ') {
                 out.pop();
@@ -163,8 +212,12 @@ pub fn fix_line_with_options(line: &str, opts: &FixOptions) -> (String, Counts) 
             while let Some(&next) = chars.peek() {
                 if next == ' ' {
                     chars.next();
-                } else if is_wide_dash(next) {
-                    if next == '\u{2014}' { counts.em += 1 } else { counts.bar += 1 }
+                } else if is_enabled_wide_dash(next, opts) {
+                    if next == '\u{2014}' {
+                        counts.em += 1;
+                    } else if next == '\u{2015}' {
+                        counts.bar += 1;
+                    }
                     chars.next();
                 } else {
                     break;
@@ -176,8 +229,10 @@ pub fn fix_line_with_options(line: &str, opts: &FixOptions) -> (String, Counts) 
                 out.push_str(" - ");
             }
             inserted_dash_at_end = true;
-        } else if c == '\u{2013}' && opts.en_dash {
-            counts.en += 1;
+        } else if (c == '\u{2013}' && opts.en_dash) || c == ENTITY_EN_MARKER {
+            if c == '\u{2013}' {
+                counts.en += 1;
+            }
             out.push('-');
             inserted_dash_at_end = false;
         } else if is_curly_quote(c) && opts.curly_quotes {
@@ -252,7 +307,9 @@ pub fn fix_content_with_options(
 
         if in_fence {
             new_content.push_str(line);
-            if cr { new_content.push('\r'); }
+            if cr {
+                new_content.push('\r');
+            }
             continue;
         }
 
@@ -274,7 +331,12 @@ pub fn fix_content_with_options(
         }
     }
 
-    FixResult { new_content, counts, changes, lines_changed }
+    FixResult {
+        new_content,
+        counts,
+        changes,
+        lines_changed,
+    }
 }
 
 #[cfg(test)]
@@ -306,12 +368,35 @@ mod tests {
         let (out, c) = fix_line("a&mdash;b and c &#8212; d");
         assert_eq!(out, "a - b and c - d");
         assert_eq!(c.entities, 2);
+        assert_eq!(c.em, 0);
+        assert_eq!(c.total(), 2);
     }
 
     #[test]
     fn dash_run_collapses() {
         let (out, _) = fix_line("wait\u{2014}\u{2014}what");
         assert_eq!(out, "wait - what");
+    }
+
+    #[test]
+    fn em_dash_and_horizontal_bar_options_are_independent() {
+        let em_disabled = FixOptions {
+            em_dash: false,
+            ..FixOptions::default()
+        };
+        let (out, counts) = fix_line_with_options("em\u{2014}dash bar\u{2015}done", &em_disabled);
+        assert_eq!(out, "em\u{2014}dash bar - done");
+        assert_eq!(counts.em, 0);
+        assert_eq!(counts.bar, 1);
+
+        let bar_disabled = FixOptions {
+            horizontal_bar: false,
+            ..FixOptions::default()
+        };
+        let (out, counts) = fix_line_with_options("em\u{2014}dash bar\u{2015}done", &bar_disabled);
+        assert_eq!(out, "em - dash bar\u{2015}done");
+        assert_eq!(counts.em, 1);
+        assert_eq!(counts.bar, 0);
     }
 
     #[test]

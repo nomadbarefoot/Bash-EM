@@ -46,10 +46,24 @@ const TIER2_PHRASES: &[&str] = &[
 ];
 
 const TELL_WORDS: &[&str] = &[
-    "delve", "tapestry", "multifaceted", "utilize", "landscape",
-    "embark", "meticulous", "testament", "pivotal", "underscores",
-    "navigate", "realm", "intricate", "furthermore", "comprehensive",
-    "robust", "streamline", "leverage",
+    "delve",
+    "tapestry",
+    "multifaceted",
+    "utilize",
+    "landscape",
+    "embark",
+    "meticulous",
+    "testament",
+    "pivotal",
+    "underscores",
+    "navigate",
+    "realm",
+    "intricate",
+    "furthermore",
+    "comprehensive",
+    "robust",
+    "streamline",
+    "leverage",
 ];
 
 const TELL_WORD_THRESHOLD: usize = 3;
@@ -93,9 +107,10 @@ pub fn scan_content(content: &str) -> BoilerplateReport {
         for (line_no, line) in content.lines().enumerate() {
             let line_lower = line.to_lowercase();
             for &word in TELL_WORDS {
-                if line_lower.split_whitespace().any(|w| {
-                    w.trim_matches(|c: char| !c.is_alphanumeric()) == word
-                }) {
+                if line_lower
+                    .split_whitespace()
+                    .any(|w| w.trim_matches(|c: char| !c.is_alphanumeric()) == word)
+                {
                     matches.push(BoilerplateMatch {
                         line_no: line_no + 1,
                         phrase: format!("tell-word: {}", word),

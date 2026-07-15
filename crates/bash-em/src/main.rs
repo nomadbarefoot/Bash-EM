@@ -1,13 +1,14 @@
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use engine::FixOptions;
 
 #[derive(Parser)]
 #[command(name = "bash-em", version, about = "bash them dashes")]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -20,7 +21,7 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Apply replacements (with backup)
+    /// Apply replacements after creating a backup
     Apply {
         path: PathBuf,
         #[arg(long)]
@@ -28,11 +29,18 @@ enum Commands {
         #[arg(long)]
         yes: bool,
     },
-    /// Restore files from a backup run
+    /// Restore files from a retained backup run
     Restore {
         run_id: String,
+        #[arg(long)]
+        profile: Option<PathBuf>,
     },
-    /// Show health report for a directory
+    /// Manage retained backup runs
+    Backups {
+        #[command(subcommand)]
+        action: BackupsAction,
+    },
+    /// Show a health report for a directory
     Health {
         path: PathBuf,
         #[arg(long)]
@@ -50,12 +58,12 @@ enum Commands {
         #[command(subcommand)]
         action: ProfileAction,
     },
-    /// Manage adapters
+    /// List active adapters
     Adapters {
         #[command(subcommand)]
         action: AdaptersAction,
     },
-    /// Launch interactive TUI
+    /// Launch the interactive TUI
     Tui {
         path: Option<PathBuf>,
         #[arg(long)]
@@ -79,411 +87,349 @@ enum AdaptersAction {
     List,
 }
 
-fn load_profile_or_default(path: Option<&PathBuf>) -> config::Profile {
-    match path {
-        Some(p) => match config::load_profile(p) {
-            Ok(profile) => profile,
-            Err(e) => {
-                eprintln!("{} {}", "error:".red().bold(), e);
-                std::process::exit(1);
-            }
-        },
-        None => config::default_profile(),
-    }
+#[derive(Subcommand)]
+enum BackupsAction {
+    /// List retained backup runs
+    List {
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
 }
 
-fn build_fix_options(profile: &config::Profile) -> FixOptions {
-    let pairs: Vec<(String, bool)> = profile.rules.iter()
-        .map(|(k, v)| (k.clone(), v.enabled))
-        .collect();
-    FixOptions::from_profile(&pairs)
+fn load_profile_or_default(path: Option<&PathBuf>) -> config::Profile {
+    let root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    resolve_profile_or_exit(&root, path).profile
+}
+
+fn resolve_profile_or_exit(
+    root: &std::path::Path,
+    explicit: Option<&PathBuf>,
+) -> config::ProfileDocument {
+    config::resolve_profile(root, explicit.map(PathBuf::as_path)).unwrap_or_else(|error| {
+        eprintln!("{} {}", "error:".red().bold(), error);
+        std::process::exit(1);
+    })
+}
+
+fn scan_path(path: PathBuf, profile: config::Profile) -> workflow::ScanReport {
+    workflow::scan(
+        workflow::ScanRequest {
+            root: path,
+            profile,
+        },
+        |_| {},
+        &AtomicBool::new(false),
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("{} {}", "error:".red().bold(), error);
+        std::process::exit(1);
+    })
 }
 
 fn cmd_scan(path: PathBuf, profile_path: Option<PathBuf>, json: bool) {
-    let profile = load_profile_or_default(profile_path.as_ref());
-    let root = match path.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("{} {}: {}", "error:".red().bold(), path.display(), e);
-            std::process::exit(1);
-        }
-    };
-
-    let opts = build_fix_options(&profile);
-    let (candidates, stats) = adapters::walk_tree(&root, &profile.prefs);
-    let pipeline = engine::Pipeline::with_options(
-        profile.prefs.preview_lines, opts, profile.prefs.fence_guard,
-    );
-    let batch = pipeline.process_batch(
-        candidates.into_iter().map(|c| (c.path, c.content)).collect()
-    );
-
-    let llm_enabled = config::is_rule_enabled(&profile, "llm_boilerplate");
+    let profile = resolve_profile_or_exit(&path, profile_path.as_ref()).profile;
+    let report = scan_path(path, profile);
 
     if json {
-        let report = diff::RunReport {
+        let output = diff::RunReport {
             run_id: String::new(),
             timestamp: String::new(),
-            root: root.clone(),
-            profile: profile.name.clone(),
-            files: batch.files.iter().map(|f| diff::FileDiff {
-                path: f.path.clone(),
-                hunks: f.changes.iter().map(|c| diff::LineHunk {
-                    line_no: c.line_no,
-                    before: c.before.clone(),
-                    after: c.after.clone(),
-                }).collect(),
-                counts: f.counts,
-                lines_changed: f.lines_changed,
-            }).collect(),
-            totals: batch.totals,
+            root: report.root.clone(),
+            profile: report.profile.name.clone(),
+            files: report
+                .files
+                .iter()
+                .map(|file| diff::FileDiff {
+                    path: file.path.clone(),
+                    hunks: file
+                        .changes
+                        .iter()
+                        .map(|change| diff::LineHunk {
+                            line_no: change.line_no,
+                            before: change.before.clone(),
+                            after: change.after.clone(),
+                        })
+                        .collect(),
+                    counts: file.counts,
+                    lines_changed: file.lines_changed,
+                })
+                .collect(),
+            totals: report.totals,
         };
-        println!("{}", report.to_json().unwrap());
+        println!("{}", output.to_json().expect("serialize scan report"));
         return;
     }
 
     println!("{}", "bash-em scan".bold());
-    println!("  root: {}", root.display());
-    println!("  scanned: {}  skipped: {}", stats.scanned, stats.skipped);
+    println!("  root: {}", report.root.display());
+    println!(
+        "  scanned: {}  skipped: {}  ignored: {}  binary: {}",
+        report.stats.scanned,
+        report.stats.skipped,
+        report.stats.ignored + report.stats.hidden_dirs,
+        report.stats.binary
+    );
     println!();
 
-    if batch.files.is_empty() && !llm_enabled {
-        println!("  {} no offenders found.", "\u{2714}".green());
+    if report.files.is_empty() {
+        println!("  {} no offenders found.", "✓".green());
         return;
     }
 
-    if !batch.files.is_empty() {
-        println!("  {} {} files with artifacts:",
-            batch.files.len().to_string().yellow().bold(),
-            "dirty");
-
-        for f in &batch.files {
-            let rel = f.path.strip_prefix(&root).unwrap_or(&f.path);
-            println!("    {} {} (em:{} en:{} bar:{} ent:{} cq:{} ell:{} zw:{})",
-                "\u{25cf}".red(),
-                rel.display(),
-                f.counts.em, f.counts.en, f.counts.bar, f.counts.entities,
-                f.counts.curly_quotes, f.counts.ellipsis, f.counts.zero_width);
-
-            for c in &f.changes {
-                println!("      L{}: {} {} {}",
-                    c.line_no,
-                    c.before.red(),
-                    "\u{2192}".dimmed(),
-                    c.after.green());
-            }
-        }
-
-        println!();
-        println!("  totals: {} em, {} en, {} bar, {} ent, {} cq, {} ell, {} zw",
-            batch.totals.em.to_string().yellow(),
-            batch.totals.en.to_string().yellow(),
-            batch.totals.bar.to_string().yellow(),
-            batch.totals.entities.to_string().yellow(),
-            batch.totals.curly_quotes.to_string().yellow(),
-            batch.totals.ellipsis.to_string().yellow(),
-            batch.totals.zero_width.to_string().yellow());
-    }
-
-    if llm_enabled {
-        println!();
-        println!("  {}", "LLM boilerplate flags:".bold());
-        let mut any_flags = false;
-        for f in &batch.files {
-            let content = std::fs::read_to_string(&f.path).unwrap_or_default();
-            let report = engine::boilerplate::scan_content(&content);
-            if !report.matches.is_empty() {
-                any_flags = true;
-                let rel = f.path.strip_prefix(&root).unwrap_or(&f.path);
-                for m in &report.matches {
-                    println!("    {} {}:L{} [{}] {}",
-                        "\u{26a0}".yellow(),
-                        rel.display(),
-                        m.line_no,
-                        match m.confidence {
-                            engine::boilerplate::Confidence::NearCertain => "near-certain",
-                            engine::boilerplate::Confidence::High => "high",
-                        },
-                        m.phrase);
-                }
-            }
-        }
-        if !any_flags {
-            println!("    {} no LLM tells detected.", "\u{2714}".green());
+    println!(
+        "  {} dirty files:",
+        report.files.len().to_string().yellow().bold()
+    );
+    for file in &report.files {
+        let relative = file.path.strip_prefix(&report.root).unwrap_or(&file.path);
+        println!(
+            "    {} {} (em:{} en:{} bar:{} ent:{} cq:{} ell:{} zw:{})",
+            "●".red(),
+            relative.display(),
+            file.counts.em,
+            file.counts.en,
+            file.counts.bar,
+            file.counts.entities,
+            file.counts.curly_quotes,
+            file.counts.ellipsis,
+            file.counts.zero_width
+        );
+        for change in &file.changes {
+            println!(
+                "      L{}: {} {} {}",
+                change.line_no,
+                change.before.red(),
+                "→".dimmed(),
+                change.after.green()
+            );
         }
     }
+    println!();
+    println!(
+        "  total offenders: {}",
+        report.totals.total().to_string().yellow()
+    );
 }
 
 fn cmd_apply(path: PathBuf, profile_path: Option<PathBuf>, yes: bool) {
-    let profile = load_profile_or_default(profile_path.as_ref());
-    let root = match path.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("{} {}: {}", "error:".red().bold(), path.display(), e);
-            std::process::exit(1);
-        }
-    };
-
-    let backup_dir = config::resolve_backup_dir(&profile.prefs);
-    let opts = build_fix_options(&profile);
-    let (candidates, _stats) = adapters::walk_tree(&root, &profile.prefs);
-    let pipeline = engine::Pipeline::with_options(
-        profile.prefs.preview_lines, opts.clone(), profile.prefs.fence_guard,
-    );
-    let batch = pipeline.process_batch(
-        candidates.into_iter().map(|c| (c.path, c.content)).collect()
-    );
-
-    if batch.files.is_empty() {
-        println!("{} nothing to bash.", "\u{2714}".green());
+    let profile = resolve_profile_or_exit(&path, profile_path.as_ref()).profile;
+    let report = scan_path(path, profile);
+    if report.files.is_empty() {
+        println!("{} nothing to bash.", "✓".green());
         return;
     }
 
-    println!("{} files with artifacts. {} total offenders.",
-        batch.files.len().to_string().yellow().bold(),
-        batch.totals.total().to_string().red().bold());
-
+    println!(
+        "{} dirty files. {} total offenders.",
+        report.files.len().to_string().yellow().bold(),
+        report.totals.total().to_string().red().bold()
+    );
     if !yes {
         eprint!("apply? [y/N] ");
         let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        std::io::stdin()
+            .read_line(&mut input)
+            .expect("read confirmation");
         if !input.trim().eq_ignore_ascii_case("y") {
             println!("aborted.");
             return;
         }
     }
 
-    let (run_dir, run_id, mut manifest) = backup::begin_run(&backup_dir, &root, &profile.name)
-        .unwrap_or_else(|e| {
-            eprintln!("{} backup init: {}", "error:".red().bold(), e);
-            std::process::exit(1);
-        });
-
-    println!("backup: {}", run_id.dimmed());
-
-    let mut applied = 0;
-    let mut errors = 0;
-
-    for file_edits in &batch.files {
-        match backup::snapshot_file(&run_dir, &file_edits.path, &root) {
-            Ok(entry) => manifest.files.push(entry),
-            Err(e) => {
-                eprintln!("  {} snapshot {}: {}", "!".red(), file_edits.path.display(), e);
-                errors += 1;
-                continue;
-            }
-        }
-
-        match adapters::TextAdapter::apply(&file_edits.path, 0) {
-            Ok(_counts) => applied += 1,
-            Err(e) => {
-                eprintln!("  {} apply {}: {}", "!".red(), file_edits.path.display(), e);
-                errors += 1;
-            }
-        }
+    let included = workflow::included_paths(&report);
+    let applied = workflow::apply(&report, &included).unwrap_or_else(|error| {
+        eprintln!("{} {}", "error:".red().bold(), error);
+        std::process::exit(1);
+    });
+    println!("  backup vault: {}", applied.backup_dir.display());
+    if let Some(run_id) = &applied.run_id {
+        println!("  backup run: {}", run_id.dimmed());
     }
-
-    backup::seal_manifest(&run_dir, &manifest)
-        .unwrap_or_else(|e| eprintln!("{} seal manifest: {}", "warn:".yellow(), e));
-
-    match backup::prune_old_runs(&backup_dir, profile.prefs.keep_last_n) {
-        Ok(pruned) if pruned > 0 => {
-            println!("  pruned {} old backup(s).", pruned);
-        }
-        _ => {}
+    println!(
+        "  {} {} files bashed. {} errors.",
+        "✓".green(),
+        applied.applied_files.to_string().green().bold(),
+        applied.errors.len()
+    );
+    if applied.pruned_runs > 0 {
+        println!("  pruned {} old backup(s).", applied.pruned_runs);
     }
-
-    println!();
-    println!("  {} {} files bashed. {} errors.",
-        "\u{2714}".green(),
-        applied.to_string().green().bold(),
-        errors);
-    println!("  restore with: {} {}",
-        "bash-em restore".bold(),
-        run_id);
+    for error in &applied.errors {
+        eprintln!("  {} {}", "!".red(), error);
+    }
 }
 
-fn cmd_restore(run_id: String) {
-    let prefs = config::Prefs::default();
-    let backup_dir = config::resolve_backup_dir(&prefs);
-
-    match backup::restore(&backup_dir, &run_id) {
-        Ok(count) => {
-            println!("{} restored {} files.", "\u{2714}".green(), count);
+fn cmd_restore(run_id: String, profile_path: Option<PathBuf>) {
+    let profile = load_profile_or_default(profile_path.as_ref());
+    match workflow::restore(&profile, &run_id) {
+        Ok(report) => {
+            println!("{} restored {} files.", "✓".green(), report.restored_files);
+            println!(
+                "  backup retained: {}/{}",
+                report.backup_dir.display(),
+                run_id
+            );
         }
-        Err(e) => {
-            eprintln!("{} {}", "error:".red().bold(), e);
+        Err(error) => {
+            eprintln!("{} {}", "error:".red().bold(), error);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_backups(profile_path: Option<PathBuf>) {
+    let profile = load_profile_or_default(profile_path.as_ref());
+    let backup_dir = config::resolve_backup_dir(&profile.prefs);
+    println!("{}", "bash-em backups".bold());
+    println!("  vault: {}", backup_dir.display());
+    match workflow::list_backups(&profile) {
+        Ok(runs) if runs.is_empty() => println!("  no backup runs found."),
+        Ok(runs) => {
+            for run in runs {
+                println!(
+                    "  {}  {} files  {}  {}",
+                    run.run_id,
+                    run.file_count,
+                    run.profile_name,
+                    run.root.display()
+                );
+            }
+        }
+        Err(error) => {
+            eprintln!("{} {}", "error:".red().bold(), error);
             std::process::exit(1);
         }
     }
 }
 
 fn cmd_health(path: PathBuf, profile_path: Option<PathBuf>, json: bool) {
-    let profile = load_profile_or_default(profile_path.as_ref());
-    let root = match path.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("{} {}: {}", "error:".red().bold(), path.display(), e);
-            std::process::exit(1);
-        }
-    };
-
-    let opts = build_fix_options(&profile);
-    let (candidates, stats) = adapters::walk_tree(&root, &profile.prefs);
-    let pipeline = engine::Pipeline::with_options(
-        profile.prefs.preview_lines, opts, profile.prefs.fence_guard,
-    );
-
-    let llm_enabled = config::is_rule_enabled(&profile, "llm_boilerplate");
-    let mut health = engine::health::HealthReport::new(root.clone(), stats.scanned, stats.skipped);
-
-    for cand in &candidates {
-        let edits = pipeline.process_content(cand.path.clone(), &cand.content);
-        let counts = edits.as_ref().map(|e| e.counts).unwrap_or_default();
-        let ext = cand.path.extension().and_then(|e| e.to_str()).unwrap_or("other");
-        let category = match ext {
-            "md" | "txt" | "rst" => "text",
-            "rs" | "py" | "js" | "ts" | "go" | "rb" => "code",
-            "html" | "htm" | "css" => "web",
-            "xlsx" => "office",
-            "docx" => "docs",
-            "pdf" => "pdf",
-            _ => "other",
-        };
-        health.add_file(cand.path.clone(), &counts, category);
-
-        if llm_enabled {
-            let bp = engine::boilerplate::scan_content(&cand.content);
-            health.add_boilerplate(&bp);
-        }
-    }
-
-    health.finalize();
-
+    let profile = resolve_profile_or_exit(&path, profile_path.as_ref()).profile;
+    let report = scan_path(path, profile);
+    let health = report.health;
     if json {
-        let j = serde_json::to_string_pretty(&health).unwrap();
-        println!("{}", j);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&health).expect("serialize health report")
+        );
         return;
     }
 
     println!("{}", "bash-em health".bold());
-    println!("  root: {}", root.display());
+    println!("  root: {}", health.root.display());
     println!("  scanned: {}  skipped: {}", health.scanned, health.skipped);
-    println!("  score: {}/100", score_colored(health.score));
-    println!();
-
-    let c = &health.corruption;
-    println!("  {}", "corruption breakdown:".bold());
-    if c.em_dash > 0 { println!("    em-dash:      {}", c.em_dash.to_string().yellow()); }
-    if c.en_dash > 0 { println!("    en-dash:      {}", c.en_dash.to_string().yellow()); }
-    if c.horizontal_bar > 0 { println!("    horiz-bar:    {}", c.horizontal_bar.to_string().yellow()); }
-    if c.html_entities > 0 { println!("    html-entities: {}", c.html_entities.to_string().yellow()); }
-    if c.curly_quotes > 0 { println!("    curly-quotes: {}", c.curly_quotes.to_string().yellow()); }
-    if c.ellipsis > 0 { println!("    ellipsis:     {}", c.ellipsis.to_string().yellow()); }
-    if c.zero_width > 0 { println!("    zero-width:   {}", c.zero_width.to_string().yellow()); }
-    if c.llm_flags > 0 { println!("    llm-flags:    {}", c.llm_flags.to_string().yellow()); }
-    if c.total() == 0 { println!("    {}", "clean!".green()); }
-
-    if !health.by_category.is_empty() {
-        println!();
-        println!("  {}", "by category:".bold());
-        for (cat, s) in &health.by_category {
-            if s.artifact_count > 0 {
-                println!("    {}: {} files, {} artifacts", cat, s.file_count, s.artifact_count);
-            }
-        }
-    }
-
-    if !health.top_files.is_empty() {
-        println!();
-        println!("  {}", "worst offenders:".bold());
-        for (path, count) in health.top_files.iter().take(10) {
-            let rel = path.strip_prefix(&root).unwrap_or(path);
-            println!("    {} {} ({})", "\u{25cf}".red(), rel.display(), count);
-        }
+    println!(
+        "  dirty files: {}  health score: {}/100",
+        health.dirty_files,
+        score_colored(health.score)
+    );
+    println!("  artifacts: {}", health.corruption.total());
+    for (path, count) in health.top_files.iter().take(10) {
+        let relative = path.strip_prefix(&health.root).unwrap_or(path);
+        println!("    {} {} ({})", "●".red(), relative.display(), count);
     }
 }
 
 fn score_colored(score: u8) -> colored::ColoredString {
-    let s = score.to_string();
-    if score == 0 { s.green().bold() }
-    else if score < 25 { s.yellow() }
-    else if score < 50 { s.yellow().bold() }
-    else { s.red().bold() }
+    let value = score.to_string();
+    if score == 0 {
+        value.green().bold()
+    } else if score < 50 {
+        value.yellow()
+    } else {
+        value.red().bold()
+    }
 }
 
 fn cmd_rules_list() {
-    let profile = config::default_profile();
-    println!("{}", "available rules:".bold());
-    for (name, rc) in &profile.rules {
-        let status = if rc.enabled {
-            "on".green().to_string()
+    for (name, rule) in &config::default_profile().rules {
+        let status = if rule.enabled {
+            "on".green()
         } else {
-            "off".dimmed().to_string()
+            "off".dimmed()
         };
         println!("  {} [{}]", name, status);
     }
 }
 
 fn cmd_profile_show(file: Option<PathBuf>) {
-    let profile = match file {
-        Some(ref p) => load_profile_or_default(Some(p)),
-        None => config::default_profile(),
-    };
-    let yaml = serde_yaml::to_string(&profile).unwrap();
-    println!("{}", yaml);
+    let profile = load_profile_or_default(file.as_ref());
+    println!(
+        "{}",
+        serde_yaml::to_string(&profile).expect("serialize profile")
+    );
 }
 
 fn cmd_profile_validate(file: PathBuf) {
     match config::load_profile(&file) {
-        Ok(p) => println!("{} profile '{}' is valid.", "\u{2714}".green(), p.name),
-        Err(e) => {
-            eprintln!("{} {}", "error:".red().bold(), e);
+        Ok(profile) => println!("{} profile '{}' is valid.", "✓".green(), profile.name),
+        Err(error) => {
+            eprintln!("{} {}", "error:".red().bold(), error);
             std::process::exit(1);
         }
     }
 }
 
 fn cmd_adapters_list() {
-    let registry = adapters::Registry::default();
-    println!("{}", "registered adapters:".bold());
-    for (name, exts, category, can_write) in registry.list() {
+    println!("{}", "active adapters:".bold());
+    for (name, extensions, category, can_write) in adapters::Registry::default().list() {
         let mode = if can_write { "read/write" } else { "read-only" };
-        let ext_list: Vec<&str> = exts.iter().take(8).copied().collect();
-        println!("  {} [{}] ({}) .{}",
-            name, category, mode,
-            ext_list.join(", ."));
+        println!(
+            "  {} [{}] ({}) .{}",
+            name,
+            category,
+            mode,
+            extensions
+                .iter()
+                .take(8)
+                .copied()
+                .collect::<Vec<_>>()
+                .join(", .")
+        );
     }
 }
 
 fn cmd_tui(path: Option<PathBuf>, profile_path: Option<PathBuf>) {
-    let profile = load_profile_or_default(profile_path.as_ref());
-    let root = path.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let root =
+        path.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     let root = root.canonicalize().unwrap_or(root);
-    let app = bash_em_tui::app::App::new(root, profile);
-    if let Err(e) = bash_em_tui::run::run(app) {
-        eprintln!("{} TUI: {}", "error:".red().bold(), e);
+    let document = resolve_profile_or_exit(&root, profile_path.as_ref());
+    let app = bash_em_tui::app::App::with_profile_document(root, document);
+    if let Err(error) = bash_em_tui::run::run(app) {
+        eprintln!("{} TUI: {}", "error:".red().bold(), error);
         std::process::exit(1);
     }
 }
 
 fn main() {
-    let cli = Cli::parse();
-    match cli.command {
-        Commands::Scan { path, profile, json } => cmd_scan(path, profile, json),
-        Commands::Apply { path, profile, yes } => cmd_apply(path, profile, yes),
-        Commands::Restore { run_id } => cmd_restore(run_id),
-        Commands::Health { path, json, profile } => cmd_health(path, profile, json),
-        Commands::Rules { action } => match action {
-            RulesAction::List => cmd_rules_list(),
-        },
-        Commands::Profile { action } => match action {
-            ProfileAction::Show { file } => cmd_profile_show(file),
-            ProfileAction::Validate { file } => cmd_profile_validate(file),
-        },
-        Commands::Adapters { action } => match action {
-            AdaptersAction::List => cmd_adapters_list(),
-        },
-        Commands::Tui { path, profile } => cmd_tui(path, profile),
+    match Cli::parse().command {
+        None => cmd_tui(None, None),
+        Some(Commands::Scan {
+            path,
+            profile,
+            json,
+        }) => cmd_scan(path, profile, json),
+        Some(Commands::Apply { path, profile, yes }) => cmd_apply(path, profile, yes),
+        Some(Commands::Restore { run_id, profile }) => cmd_restore(run_id, profile),
+        Some(Commands::Backups {
+            action: BackupsAction::List { profile },
+        }) => cmd_backups(profile),
+        Some(Commands::Health {
+            path,
+            json,
+            profile,
+        }) => cmd_health(path, profile, json),
+        Some(Commands::Rules {
+            action: RulesAction::List,
+        }) => cmd_rules_list(),
+        Some(Commands::Profile {
+            action: ProfileAction::Show { file },
+        }) => cmd_profile_show(file),
+        Some(Commands::Profile {
+            action: ProfileAction::Validate { file },
+        }) => cmd_profile_validate(file),
+        Some(Commands::Adapters {
+            action: AdaptersAction::List,
+        }) => cmd_adapters_list(),
+        Some(Commands::Tui { path, profile }) => cmd_tui(path, profile),
     }
 }

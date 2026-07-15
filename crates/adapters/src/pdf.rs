@@ -1,5 +1,5 @@
-use std::path::Path;
 use crate::adapter::{Adapter, FileCategory};
+use std::path::Path;
 
 const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
@@ -7,8 +7,7 @@ pub struct PdfAdapter;
 
 impl PdfAdapter {
     pub fn extract_text(path: &Path) -> Result<String, String> {
-        let bytes = std::fs::read(path)
-            .map_err(|e| format!("read pdf: {}", e))?;
+        let bytes = std::fs::read(path).map_err(|e| format!("read pdf: {}", e))?;
 
         if bytes.len() < 5 || &bytes[..5] != b"%PDF-" {
             return Err("not a PDF file".into());
@@ -26,10 +25,18 @@ impl PdfAdapter {
 }
 
 impl Adapter for PdfAdapter {
-    fn name(&self) -> &'static str { "pdf" }
-    fn extensions(&self) -> &'static [&'static str] { PDF_EXTENSIONS }
-    fn category(&self) -> FileCategory { FileCategory::Pdf }
-    fn can_write(&self) -> bool { false }
+    fn name(&self) -> &'static str {
+        "pdf"
+    }
+    fn extensions(&self) -> &'static [&'static str] {
+        PDF_EXTENSIONS
+    }
+    fn category(&self) -> FileCategory {
+        FileCategory::Pdf
+    }
+    fn can_write(&self) -> bool {
+        false
+    }
 
     fn probe(&self, _path: &Path, first_bytes: &[u8]) -> bool {
         first_bytes.len() >= 5 && &first_bytes[..5] == b"%PDF-"

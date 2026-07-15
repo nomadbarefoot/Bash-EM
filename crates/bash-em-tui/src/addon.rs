@@ -1,6 +1,6 @@
-use ratatui::Frame;
-use ratatui::layout::Rect;
 use crossterm::event::{KeyEvent, MouseEvent};
+use ratatui::layout::Rect;
+use ratatui::Frame;
 
 pub trait Addon: Send {
     fn name(&self) -> &str;

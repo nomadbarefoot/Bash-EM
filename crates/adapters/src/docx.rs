@@ -1,6 +1,6 @@
-use std::path::Path;
-use std::io::{Read as IoRead, Write as IoWrite};
 use crate::adapter::{Adapter, FileCategory};
+use std::io::{Read as IoRead, Write as IoWrite};
+use std::path::Path;
 
 const DOCX_EXTENSIONS: &[&str] = &["docx"];
 
@@ -8,17 +8,22 @@ pub struct DocxAdapter;
 
 impl DocxAdapter {
     pub fn read_document_xml(path: &Path) -> Result<Vec<(String, String)>, String> {
-        let file = std::fs::File::open(path)
-            .map_err(|e| format!("open docx: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| format!("read docx zip: {}", e))?;
+        let file = std::fs::File::open(path).map_err(|e| format!("open docx: {}", e))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| format!("read docx zip: {}", e))?;
 
         let mut results = Vec::new();
-        let target_files = ["word/document.xml", "word/header1.xml", "word/header2.xml",
-                            "word/footer1.xml", "word/footer2.xml"];
+        let target_files = [
+            "word/document.xml",
+            "word/header1.xml",
+            "word/header2.xml",
+            "word/footer1.xml",
+            "word/footer2.xml",
+        ];
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)
+            let mut entry = archive
+                .by_index(i)
                 .map_err(|e| format!("docx entry {}: {}", i, e))?;
 
             let name = entry.name().to_string();
@@ -27,7 +32,8 @@ impl DocxAdapter {
             }
 
             let mut xml = String::new();
-            entry.read_to_string(&mut xml)
+            entry
+                .read_to_string(&mut xml)
                 .map_err(|e| format!("read docx xml: {}", e))?;
             results.push((name, xml));
         }
@@ -84,56 +90,67 @@ impl DocxAdapter {
             .map(|(k, v)| (k.as_str(), v.as_slice()))
             .collect();
 
-        let file = std::fs::File::open(path)
-            .map_err(|e| format!("open docx: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| format!("read docx: {}", e))?;
+        let file = std::fs::File::open(path).map_err(|e| format!("open docx: {}", e))?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("read docx: {}", e))?;
 
         let tmp_path = path.with_extension("bashm_docx_tmp");
-        let tmp_file = std::fs::File::create(&tmp_path)
-            .map_err(|e| format!("create tmp docx: {}", e))?;
+        let tmp_file =
+            std::fs::File::create(&tmp_path).map_err(|e| format!("create tmp docx: {}", e))?;
         let mut writer = zip::ZipWriter::new(tmp_file);
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)
+            let mut entry = archive
+                .by_index(i)
                 .map_err(|e| format!("docx entry {}: {}", i, e))?;
 
             let name = entry.name().to_string();
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(entry.compression());
+            let options =
+                zip::write::SimpleFileOptions::default().compression_method(entry.compression());
 
-            writer.start_file(&name, options)
+            writer
+                .start_file(&name, options)
                 .map_err(|e| format!("write docx entry {}: {}", name, e))?;
 
             let mut buf = Vec::new();
-            entry.read_to_end(&mut buf)
+            entry
+                .read_to_end(&mut buf)
                 .map_err(|e| format!("read docx entry: {}", e))?;
 
             if let Some(repls) = replace_map.get(name.as_str()) {
-                let xml = String::from_utf8(buf)
-                    .map_err(|_| format!("non-utf8 xml in {}", name))?;
+                let xml =
+                    String::from_utf8(buf).map_err(|_| format!("non-utf8 xml in {}", name))?;
                 let modified = Self::replace_text_in_xml(&xml, repls);
-                writer.write_all(modified.as_bytes())
+                writer
+                    .write_all(modified.as_bytes())
                     .map_err(|e| format!("write docx xml: {}", e))?;
             } else {
-                writer.write_all(&buf)
+                writer
+                    .write_all(&buf)
                     .map_err(|e| format!("write docx entry: {}", e))?;
             }
         }
 
-        writer.finish()
+        writer
+            .finish()
             .map_err(|e| format!("finalize docx: {}", e))?;
-        std::fs::rename(&tmp_path, path)
-            .map_err(|e| format!("rename docx: {}", e))?;
+        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename docx: {}", e))?;
         Ok(())
     }
 }
 
 impl Adapter for DocxAdapter {
-    fn name(&self) -> &'static str { "docx" }
-    fn extensions(&self) -> &'static [&'static str] { DOCX_EXTENSIONS }
-    fn category(&self) -> FileCategory { FileCategory::Docs }
-    fn can_write(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "docx"
+    }
+    fn extensions(&self) -> &'static [&'static str] {
+        DOCX_EXTENSIONS
+    }
+    fn category(&self) -> FileCategory {
+        FileCategory::Docs
+    }
+    fn can_write(&self) -> bool {
+        true
+    }
 
     fn probe(&self, _path: &Path, first_bytes: &[u8]) -> bool {
         first_bytes.len() >= 4 && first_bytes[..4] == [0x50, 0x4B, 0x03, 0x04]

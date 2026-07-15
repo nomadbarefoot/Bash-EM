@@ -1,6 +1,6 @@
+use crate::adapter::{Adapter, FileCategory};
 use std::collections::HashMap;
 use std::path::Path;
-use crate::adapter::{Adapter, FileCategory};
 
 pub struct Registry {
     by_ext: HashMap<&'static str, usize>,
@@ -39,9 +39,10 @@ impl Registry {
     }
 
     pub fn list(&self) -> Vec<(&'static str, &'static [&'static str], FileCategory, bool)> {
-        self.adapters.iter().map(|a| {
-            (a.name(), a.extensions(), a.category(), a.can_write())
-        }).collect()
+        self.adapters
+            .iter()
+            .map(|a| (a.name(), a.extensions(), a.category(), a.can_write()))
+            .collect()
     }
 }
 
@@ -49,6 +50,15 @@ impl Default for Registry {
     fn default() -> Self {
         let mut reg = Self::new();
         reg.register(Box::new(crate::text::TextAdapterImpl));
+        reg
+    }
+}
+
+impl Registry {
+    /// Structured adapters remain available for development, but are not
+    /// advertised as active until their scan/apply mappings are integrated.
+    pub fn experimental() -> Self {
+        let mut reg = Self::default();
         reg.register(Box::new(crate::zip_adapter::ZipAdapter));
         reg.register(Box::new(crate::xlsx::XlsxAdapter));
         reg.register(Box::new(crate::docx::DocxAdapter));

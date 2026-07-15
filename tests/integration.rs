@@ -1,10 +1,12 @@
-use std::fs;
-use std::path::Path;
-use engine::{fix_line, fix_line_with_options, fix_content, fix_content_with_options,
-             Counts, Pipeline, FixOptions};
+use adapters::{walk_tree, Registry, TextAdapter};
 use config::{default_profile, load_profile, Prefs};
 use diff::build_diff;
-use adapters::{walk_tree, TextAdapter, Registry};
+use engine::{
+    fix_content, fix_content_with_options, fix_line, fix_line_with_options, Counts, FixOptions,
+    Pipeline,
+};
+use std::fs;
+use std::path::Path;
 
 // ── engine: dashes ──
 
@@ -91,7 +93,10 @@ fn pipeline_batch_aggregates() {
 
 #[test]
 fn curly_quotes_when_enabled() {
-    let opts = FixOptions { curly_quotes: true, ..Default::default() };
+    let opts = FixOptions {
+        curly_quotes: true,
+        ..Default::default()
+    };
     let (out, c) = fix_line_with_options("\u{201C}hello\u{201D} and \u{2018}world\u{2019}", &opts);
     assert_eq!(out, "\"hello\" and 'world'");
     assert_eq!(c.curly_quotes, 4);
@@ -108,7 +113,10 @@ fn curly_quotes_off_by_default() {
 
 #[test]
 fn ellipsis_when_enabled() {
-    let opts = FixOptions { ellipsis: true, ..Default::default() };
+    let opts = FixOptions {
+        ellipsis: true,
+        ..Default::default()
+    };
     let (out, c) = fix_line_with_options("wait\u{2026} what", &opts);
     assert_eq!(out, "wait... what");
     assert_eq!(c.ellipsis, 1);
@@ -171,14 +179,20 @@ fn fence_guard_off_processes_everything() {
 fn boilerplate_detects_tier1() {
     let report = engine::boilerplate::scan_content("As an AI language model, I can help.");
     assert!(!report.matches.is_empty());
-    assert_eq!(report.matches[0].confidence, engine::boilerplate::Confidence::NearCertain);
+    assert_eq!(
+        report.matches[0].confidence,
+        engine::boilerplate::Confidence::NearCertain
+    );
 }
 
 #[test]
 fn boilerplate_detects_tier2_phrases() {
     let report = engine::boilerplate::scan_content("It's important to note that this is key.");
     assert!(!report.matches.is_empty());
-    assert_eq!(report.matches[0].confidence, engine::boilerplate::Confidence::High);
+    assert_eq!(
+        report.matches[0].confidence,
+        engine::boilerplate::Confidence::High
+    );
 }
 
 #[test]
@@ -214,18 +228,25 @@ fn health_score_zero_when_clean() {
 #[test]
 fn health_corruption_breakdown() {
     let mut h = engine::health::HealthReport::new("/tmp".into(), 100, 0);
-    let counts = Counts { em: 5, curly_quotes: 3, ..Default::default() };
+    let counts = Counts {
+        em: 5,
+        curly_quotes: 3,
+        ..Default::default()
+    };
     h.add_file("test.md".into(), &counts, "text");
     h.finalize();
     assert_eq!(h.corruption.em_dash, 5);
     assert_eq!(h.corruption.curly_quotes, 3);
-    assert_eq!(h.score, 8);
+    assert_eq!(h.score, 1);
 }
 
 #[test]
 fn health_report_serializable() {
     let mut h = engine::health::HealthReport::new("/tmp".into(), 10, 0);
-    let counts = Counts { em: 2, ..Default::default() };
+    let counts = Counts {
+        em: 2,
+        ..Default::default()
+    };
     h.add_file("a.md".into(), &counts, "text");
     h.finalize();
     let json = serde_json::to_string(&h).unwrap();
@@ -316,7 +337,9 @@ fn text_adapter_rejects_binary() {
 #[test]
 fn text_adapter_accepts_utf8() {
     assert!(TextAdapter::looks_like_text(b"hello world"));
-    assert!(TextAdapter::looks_like_text("utf8 with em\u{2014}dash".as_bytes()));
+    assert!(TextAdapter::looks_like_text(
+        "utf8 with em\u{2014}dash".as_bytes()
+    ));
 }
 
 #[test]
@@ -327,7 +350,7 @@ fn walker_skips_dotdirs() {
     fs::write(dir.join("visible.md"), "a\u{2014}b").unwrap();
 
     let prefs = Prefs::default();
-    let (candidates, _) = walk_tree(&dir, &prefs);
+    let (candidates, _) = walk_tree(&dir, &prefs).unwrap();
     assert_eq!(candidates.len(), 1);
     assert!(candidates[0].path.ends_with("visible.md"));
     cleanup(&dir);
@@ -341,7 +364,7 @@ fn walker_skips_large_files() {
     fs::write(dir.join("small.txt"), "a\u{2014}b").unwrap();
 
     let prefs = Prefs::default();
-    let (candidates, stats) = walk_tree(&dir, &prefs);
+    let (candidates, stats) = walk_tree(&dir, &prefs).unwrap();
     assert_eq!(candidates.len(), 1);
     assert!(stats.skipped >= 1);
     cleanup(&dir);
@@ -359,7 +382,7 @@ fn registry_resolves_text_by_extension() {
 
 #[test]
 fn registry_resolves_xlsx() {
-    let reg = Registry::default();
+    let reg = Registry::experimental();
     let adapter = reg.resolve(Path::new("data.xlsx"), &[0x50, 0x4B, 0x03, 0x04]);
     assert!(adapter.is_some());
     assert_eq!(adapter.unwrap().name(), "xlsx");
@@ -367,7 +390,7 @@ fn registry_resolves_xlsx() {
 
 #[test]
 fn registry_resolves_docx() {
-    let reg = Registry::default();
+    let reg = Registry::experimental();
     let adapter = reg.resolve(Path::new("doc.docx"), &[0x50, 0x4B, 0x03, 0x04]);
     assert!(adapter.is_some());
     assert_eq!(adapter.unwrap().name(), "docx");
@@ -375,7 +398,7 @@ fn registry_resolves_docx() {
 
 #[test]
 fn registry_resolves_pdf() {
-    let reg = Registry::default();
+    let reg = Registry::experimental();
     let adapter = reg.resolve(Path::new("report.pdf"), b"%PDF-1.4");
     assert!(adapter.is_some());
     assert_eq!(adapter.unwrap().name(), "pdf");
@@ -384,7 +407,7 @@ fn registry_resolves_pdf() {
 
 #[test]
 fn registry_resolves_zip() {
-    let reg = Registry::default();
+    let reg = Registry::experimental();
     let adapter = reg.resolve(Path::new("archive.zip"), &[0x50, 0x4B, 0x03, 0x04]);
     assert!(adapter.is_some());
     assert_eq!(adapter.unwrap().name(), "zip");
@@ -392,7 +415,7 @@ fn registry_resolves_zip() {
 
 #[test]
 fn registry_lists_all_adapters() {
-    let reg = Registry::default();
+    let reg = Registry::experimental();
     let list = reg.list();
     assert!(list.len() >= 5);
     let names: Vec<&str> = list.iter().map(|(n, _, _, _)| *n).collect();
@@ -444,8 +467,7 @@ fn backup_list_runs() {
     fs::create_dir_all(&data_dir).unwrap();
     fs::write(data_dir.join("f.md"), "a\u{2014}b").unwrap();
 
-    let (run_dir, _run_id, manifest) =
-        backup::begin_run(&dir, &data_dir, "typographic").unwrap();
+    let (run_dir, _run_id, manifest) = backup::begin_run(&dir, &data_dir, "typographic").unwrap();
     backup::seal_manifest(&run_dir, &manifest).unwrap();
 
     let runs = backup::list_runs(&dir).unwrap();
@@ -462,8 +484,7 @@ fn backup_prune_keeps_n() {
     fs::write(data_dir.join("f.md"), "a\u{2014}b").unwrap();
 
     for _ in 0..5 {
-        let (run_dir, _id, manifest) =
-            backup::begin_run(&dir, &data_dir, "typographic").unwrap();
+        let (run_dir, _id, manifest) = backup::begin_run(&dir, &data_dir, "typographic").unwrap();
         backup::seal_manifest(&run_dir, &manifest).unwrap();
     }
 

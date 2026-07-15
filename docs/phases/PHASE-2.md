@@ -21,7 +21,7 @@
 - Rules: curly quotes, ellipsis, zero-width/bidi scrub, opt-in LLM boilerplate pack  
 - Code-aware context flags (fenced regions in Markdown / Astro) passed into rule ctx  
 - `HealthReport` + file categorization taxonomy  
-- Ignore file: `.bash-emignore` (gitignore semantics)  
+- Ignore file: `.bash-emignore` (gitignore semantics; implemented for the text MVP)
 - Backup retention policy in prefs (`keep_last_n`)  
 - CLI: `bash-em health <path>`, `bash-em adapters list`  
 - Fixture packs under `testdata/` per format (small, committed)

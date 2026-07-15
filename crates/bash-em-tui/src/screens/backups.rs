@@ -1,329 +1,205 @@
-use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, List, ListItem, Paragraph};
+use ratatui::Frame;
 
 use crate::app::{App, ConfirmDialog, Pane};
 use crate::event::LayoutCache;
 
-pub fn draw_backups(frame: &mut Frame, app: &App, area: Rect, layout_cache: &mut LayoutCache) {
+pub fn draw_backups(frame: &mut Frame, app: &App, area: Rect, cache: &mut LayoutCache) {
     let has_confirm = matches!(app.confirm, ConfirmDialog::RestoreRun { .. });
-
-    let main_rows = if has_confirm {
-        Layout::vertical([
-            Constraint::Min(8),
-            Constraint::Length(6),
-        ])
-        .split(area)
-    } else {
-        Layout::vertical([
-            Constraint::Min(8),
-            Constraint::Length(0),
-        ])
-        .split(area)
-    };
-
-    let cols = Layout::horizontal([
-        Constraint::Percentage(50),
-        Constraint::Percentage(50),
+    let rows = Layout::vertical([
+        Constraint::Min(7),
+        Constraint::Length(if has_confirm { 5 } else { 0 }),
     ])
-    .split(main_rows[0]);
-
-    draw_runs_table(frame, app, cols[0], layout_cache);
-    draw_profile_yaml(frame, app, cols[1]);
-
+    .split(area);
+    let columns =
+        Layout::horizontal([Constraint::Percentage(55), Constraint::Percentage(45)]).split(rows[0]);
+    draw_runs(frame, app, columns[0], cache);
+    draw_details(frame, app, columns[1]);
     if let ConfirmDialog::RestoreRun {
-        run_id,
+        ref run_id,
+        ref root,
         file_count,
         selected_button,
-    } = &app.confirm
+    } = app.confirm
     {
-        draw_restore_dialog(frame, app, main_rows[1], run_id, *file_count, *selected_button);
+        draw_confirm(
+            frame,
+            app,
+            rows[1],
+            run_id,
+            root,
+            file_count,
+            selected_button,
+        );
     }
 }
 
-fn draw_runs_table(frame: &mut Frame, app: &App, area: Rect, layout_cache: &mut LayoutCache) {
-    let theme = &app.theme;
-
-    let title = if app.runs.is_empty() {
-        " RUNS ".to_string()
-    } else {
-        format!(
-            " RUNS {:>width$} ",
-            format!("{} OF {}", app.runs_selected + 1, app.runs.len()),
-            width = 20
-        )
-    };
-
-    let runs_block = theme.panel_block(&title, app.focused_pane == Pane::RunsTable);
-    let runs_inner = runs_block.inner(area);
-    frame.render_widget(runs_block, area);
-    layout_cache.runs_area = Some(runs_inner);
-
+fn draw_runs(frame: &mut Frame, app: &App, area: Rect, cache: &mut LayoutCache) {
+    let vault = config::resolve_backup_dir(&app.profile.prefs);
+    let title = format!(" RUNS · {} ", vault.display());
+    let block = app
+        .theme
+        .panel_block(&title, app.focused_pane == Pane::RunsTable);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    cache.runs_area = Some(inner);
+    let offset = visible_offset(app.runs_selected, app.runs.len(), inner.height as usize);
+    cache.runs_offset = offset;
     if app.runs.is_empty() {
-        let lines = vec![
-            Line::default(),
-            Line::from(vec![Span::styled(
-                "no backup runs found",
-                Style::new().fg(theme.muted),
-            )]),
-            Line::default(),
-            Line::from(vec![Span::styled(
-                "originals are content-addressed.",
-                Style::new().fg(theme.muted),
-            )]),
-            Line::from(vec![Span::styled(
-                "restore is boring on purpose.",
-                Style::new().fg(theme.muted),
-            )]),
-        ];
-        let paragraph = Paragraph::new(lines).style(Style::new().bg(theme.panel));
-        frame.render_widget(paragraph, runs_inner);
+        frame.render_widget(
+            Paragraph::new("no backup runs found")
+                .style(Style::new().fg(app.theme.muted).bg(app.theme.panel)),
+            inner,
+        );
         return;
     }
-
-    // Header row
-    let header_area = Rect::new(runs_inner.x, runs_inner.y, runs_inner.width, 1);
-    let header = Paragraph::new(Line::from(vec![Span::styled(
-        format!(
-            " {:<10} {:<10} {:<6} {}",
-            "run", "when", "files", "profile"
-        ),
-        Style::new().fg(theme.muted),
-    )]))
-    .style(Style::new().bg(theme.panel));
-    frame.render_widget(header, header_area);
-
-    // Separator
-    let sep_area = Rect::new(runs_inner.x, runs_inner.y + 1, runs_inner.width, 1);
-    frame.render_widget(
-        Paragraph::new("").style(Style::new().bg(theme.panel)),
-        sep_area,
-    );
-
-    let list_area = Rect::new(
-        runs_inner.x,
-        runs_inner.y + 2,
-        runs_inner.width,
-        runs_inner.height.saturating_sub(4),
-    );
-
-    let items: Vec<ListItem> = app
+    let items = app
         .runs
         .iter()
         .enumerate()
-        .map(|(i, run)| {
-            let selected = i == app.runs_selected;
-            let bg = if selected {
-                theme.highlight_bg
+        .skip(offset)
+        .take(inner.height as usize)
+        .map(|(index, run)| {
+            let selected = index == app.runs_selected;
+            ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!("{}  ", &run.run_id[..8.min(run.run_id.len())]),
+                    Style::new().fg(app.theme.count),
+                ),
+                Span::styled(
+                    format!("{:<9}  ", run.when_relative),
+                    Style::new().fg(app.theme.text),
+                ),
+                Span::styled(
+                    format!("{:>4} files  ", run.file_count),
+                    Style::new().fg(app.theme.text),
+                ),
+                Span::styled(run.profile_name.clone(), Style::new().fg(app.theme.muted)),
+            ]))
+            .style(Style::new().bg(if selected {
+                app.theme.highlight_bg
             } else {
-                theme.panel
-            };
-            let id_short = &run.run_id[..8.min(run.run_id.len())];
-
-            let id_style = if selected {
-                Style::new()
-                    .fg(theme.count)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::new().fg(theme.count)
-            };
-
-            let line = Line::from(vec![
-                Span::styled(format!(" {:<10}", id_short), id_style),
-                Span::styled(
-                    format!(" {:<10}", run.when_relative),
-                    Style::new().fg(theme.text),
-                ),
-                Span::styled(
-                    format!(" {:<6}", run.file_count),
-                    Style::new().fg(theme.text),
-                ),
-                Span::styled(
-                    "typographic",
-                    Style::new().fg(theme.muted),
-                ),
-            ]);
-            ListItem::new(line).style(Style::new().bg(bg))
+                app.theme.panel
+            }))
         })
-        .collect();
-
-    let list = List::new(items).style(Style::new().bg(theme.panel));
-    frame.render_widget(list, list_area);
-
-    // Footer note
-    let note_y = runs_inner.y + runs_inner.height.saturating_sub(1);
-    let note_area = Rect::new(runs_inner.x, note_y, runs_inner.width, 1);
-    let note = Paragraph::new(Line::from(vec![Span::styled(
-        "originals are content-addressed. restore is boring on purpose.",
-        Style::new().fg(theme.muted),
-    )]))
-    .style(Style::new().bg(theme.panel));
-    frame.render_widget(note, note_area);
-}
-
-fn draw_profile_yaml(frame: &mut Frame, app: &App, area: Rect) {
-    let theme = &app.theme;
-    let yaml_title = format!(
-        " PROFILE \u{00b7} {} ",
-        app.profile.name.to_uppercase()
-    );
-    let yaml_block = theme.panel_block(&yaml_title, app.focused_pane == Pane::ProfileEditor);
-    let yaml_inner = yaml_block.inner(area);
-    frame.render_widget(yaml_block, area);
-
-    // VALID YAML indicator on first row
-    let valid_area = Rect::new(yaml_inner.x, yaml_inner.y, yaml_inner.width, 1);
-
-    let valid_line = Line::from(vec![
-        Span::styled(
-            "# editable here or on disk",
-            Style::new().fg(theme.muted),
-        ),
-        Span::styled(
-            format!(
-                "{:>width$}",
-                "VALID YAML",
-                width = yaml_inner
-                    .width
-                    .saturating_sub(26) as usize
-            ),
-            Style::new()
-                .fg(theme.clean)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]);
+        .collect::<Vec<_>>();
     frame.render_widget(
-        Paragraph::new(valid_line).style(Style::new().bg(theme.panel)),
-        valid_area,
+        List::new(items).style(Style::new().bg(app.theme.panel)),
+        inner,
     );
-
-    let yaml_body = Rect::new(
-        yaml_inner.x,
-        yaml_inner.y + 1,
-        yaml_inner.width,
-        yaml_inner.height.saturating_sub(1),
-    );
-
-    let yaml_lines: Vec<Line> = app
-        .profile_yaml
-        .lines()
-        .take(yaml_body.height as usize)
-        .map(|line| {
-            if line.starts_with('#') || line.starts_with("---") {
-                Line::from(vec![Span::styled(line, Style::new().fg(theme.muted))])
-            } else if let Some((key, val)) = line.split_once(':') {
-                let val_trimmed = val.trim();
-                let val_color = if val_trimmed == "true" {
-                    theme.count
-                } else if val_trimmed == "false" {
-                    theme.muted
-                } else {
-                    theme.clean
-                };
-                Line::from(vec![
-                    Span::styled(key, Style::new().fg(theme.focus)),
-                    Span::styled(":", Style::new().fg(theme.border)),
-                    Span::styled(val, Style::new().fg(val_color)),
-                ])
-            } else {
-                Line::from(vec![Span::styled(
-                    line,
-                    Style::new().fg(theme.text),
-                )])
-            }
-        })
-        .collect();
-
-    let yaml_paragraph = Paragraph::new(yaml_lines).style(Style::new().bg(theme.panel));
-    frame.render_widget(yaml_paragraph, yaml_body);
 }
 
-fn draw_restore_dialog(
+fn draw_details(frame: &mut Frame, app: &App, area: Rect) {
+    let block = app.theme.panel_block(" RESTORE TARGET ", false);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let lines = if let Some(run) = app.runs.get(app.runs_selected) {
+        vec![
+            Line::from(vec![
+                Span::styled("run      ", Style::new().fg(app.theme.muted)),
+                Span::styled(run.run_id.clone(), Style::new().fg(app.theme.count)),
+            ]),
+            Line::from(vec![
+                Span::styled("profile  ", Style::new().fg(app.theme.muted)),
+                Span::styled(run.profile_name.clone(), Style::new().fg(app.theme.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("created  ", Style::new().fg(app.theme.muted)),
+                Span::styled(run.timestamp.clone(), Style::new().fg(app.theme.text)),
+            ]),
+            Line::default(),
+            Line::from(Span::styled(
+                "files will be restored to:",
+                Style::new().fg(app.theme.muted),
+            )),
+            Line::from(Span::styled(
+                run.root.display().to_string(),
+                Style::new().fg(app.theme.focus),
+            )),
+            Line::default(),
+            Line::from(Span::styled(
+                "the restore point is retained",
+                Style::new().fg(app.theme.clean),
+            )),
+            Line::from(Span::styled(
+                if app.profile.prefs.keep_last_n == 0 {
+                    "retention: unlimited".to_string()
+                } else {
+                    format!(
+                        "retention: last {} runs globally",
+                        app.profile.prefs.keep_last_n
+                    )
+                },
+                Style::new().fg(app.theme.muted),
+            )),
+        ]
+    } else {
+        vec![Line::from(Span::styled(
+            "select a backup run",
+            Style::new().fg(app.theme.muted),
+        ))]
+    };
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::new().bg(app.theme.panel)),
+        inner,
+    );
+}
+
+fn draw_confirm(
     frame: &mut Frame,
     app: &App,
     area: Rect,
     run_id: &str,
+    root: &std::path::Path,
     file_count: usize,
     selected: u8,
 ) {
-    let theme = &app.theme;
-
     let block = Block::bordered()
-        .border_style(Style::new().fg(theme.accent))
-        .border_type(BorderType::Plain)
-        .style(Style::new().bg(theme.panel));
+        .border_type(BorderType::Double)
+        .border_style(Style::new().fg(app.theme.accent))
+        .style(Style::new().bg(app.theme.panel));
     let inner = block.inner(area);
     frame.render_widget(block, area);
+    let short = &run_id[..8.min(run_id.len())];
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::from(format!(
+                "Restore {file_count} files from {short} to {}?",
+                root.display()
+            )),
+            Line::from(vec![
+                button(" RESTORE ", selected == 0, app),
+                Span::raw("  "),
+                button(" CANCEL ", selected == 1, app),
+            ]),
+        ])
+        .alignment(Alignment::Center)
+        .style(Style::new().fg(app.theme.text).bg(app.theme.panel)),
+        inner,
+    );
+}
 
-    let rows = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Min(0),
-    ])
-    .split(inner);
-
-    // Title
-    let id_short = &run_id[..8.min(run_id.len())];
-    let msg = Paragraph::new(Line::from(vec![Span::styled(
-        format!("restore {}?", id_short),
-        Style::new()
-            .fg(theme.accent)
-            .add_modifier(Modifier::BOLD),
-    )]))
-    .style(Style::new().bg(theme.panel));
-    frame.render_widget(msg, rows[0]);
-
-    // Detail line
-    let root_name = app
-        .root
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let detail = Paragraph::new(Line::from(vec![Span::styled(
-        format!(
-            "{} files \u{2190} {}/ \u{00b7} profile hash matched \u{00b7} no sarcasm in this dialog",
-            file_count, root_name
-        ),
-        Style::new().fg(theme.muted),
-    )]))
-    .style(Style::new().bg(theme.panel));
-    frame.render_widget(detail, rows[1]);
-
-    // Buttons
-    let buttons = ["Restore", "Cancel", "Open in $EDITOR"];
-    let mut btn_spans = Vec::new();
-    btn_spans.push(Span::styled(
-        "                              ",
-        Style::new().bg(theme.panel),
-    ));
-    for (i, label) in buttons.iter().enumerate() {
-        let (fg, bg, _border_color) = if i as u8 == selected {
-            if i == 0 {
-                (theme.bg, theme.clean, theme.clean)
-            } else {
-                (theme.bg, theme.accent, theme.accent)
-            }
-        } else {
-            (theme.accent, theme.panel, theme.accent)
-        };
-        btn_spans.push(Span::styled(
-            format!("  {}  ", label),
+fn button<'a>(label: &'a str, selected: bool, app: &App) -> Span<'a> {
+    Span::styled(
+        label,
+        if selected {
             Style::new()
-                .fg(fg)
-                .bg(bg)
-                .add_modifier(if i as u8 == selected {
-                    Modifier::BOLD
-                } else {
-                    Modifier::empty()
-                }),
-        ));
-        btn_spans.push(Span::styled("  ", Style::new().bg(theme.panel)));
+                .fg(app.theme.bg)
+                .bg(app.theme.clean)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::new().fg(app.theme.muted).bg(app.theme.bar_track)
+        },
+    )
+}
+
+fn visible_offset(selected: usize, total: usize, height: usize) -> usize {
+    if total <= height || height == 0 {
+        0
+    } else {
+        selected.saturating_sub(height - 1).min(total - height)
     }
-    let btns = Paragraph::new(Line::from(btn_spans))
-        .alignment(Alignment::Right)
-        .style(Style::new().bg(theme.panel));
-    frame.render_widget(btns, rows[3]);
 }

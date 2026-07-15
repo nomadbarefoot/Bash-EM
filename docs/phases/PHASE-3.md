@@ -18,7 +18,7 @@
 - Browse mode: directory tree, category badges, artifact hints  
 - Review mode: offender list, diff preview, rule toggles, apply gauge  
 - Backups mode: list runs, inspect manifest, restore with confirm  
-- Profiles mode: view/edit YAML (embedded editor or form ↔ file)  
+- Profiles mode: rule form with atomic `.bash-em.yaml` save/reload (implemented)
 - Stats / history: lifetime kills, last run, sarcasm-friendly flash copy  
 - Crossterm mouse: click select, toggle, scroll, tab buttons  
 - `bash-em-addon-tetris`: side panel or modal; pauses when focus is Review-apply  

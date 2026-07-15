@@ -13,6 +13,7 @@ config = { path = "../config" }
 diff = { path = "../diff" }
 backup = { path = "../backup" }
 adapters = { path = "../adapters" }
+workflow = { path = "../workflow" }
 bash-em-tui = { path = "../bash-em-tui" }
 clap = { version = "4", features = ["derive"] }
 colored = "2"
