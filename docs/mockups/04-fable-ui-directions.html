@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bash-EM · three TUI directions</title>
+<style>
+  :root{--bg:#07080d;--panel:#10121a;--panel2:#161a26;--border:#2a3144;--focus:#5ce1ff;
+    --guilty:#ff4d6d;--clean:#b8f574;--count:#ffe566;--muted:#7a849c;--text:#e8ecf7;
+    --accent:#ff8c42;--en:#d978ff;--hl:#1a2438;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace}
+  *{box-sizing:border-box;margin:0}
+  body{background:#0b0d14;color:var(--text);font-family:var(--mono);padding:14px;
+    display:flex;flex-direction:column;align-items:center;gap:8px}
+  .chrome{width:100%;max-width:1160px}
+  .brand{font-weight:700;font-size:15px}
+  .struck{color:var(--guilty);text-decoration:line-through}
+  .dim{color:var(--muted);font-weight:400;font-size:12px}
+  .switch{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;align-items:center}
+  .vbtn,.sbtn{font-family:var(--mono);font-size:12px;background:#141826;color:var(--muted);
+    border:1px solid var(--border);padding:4px 10px;cursor:pointer}
+  .vbtn.on{background:var(--focus);color:#07080d;font-weight:700;border-color:var(--focus)}
+  .sbtn.on{background:#232a3d;color:var(--text)}
+  .gap{flex:1}
+  .blurb{color:var(--muted);font-size:12px;max-width:1160px;line-height:1.5;min-height:3.2em}
+  .blurb b{color:var(--text)}
+  .term{--cols:140;--rows:40;--rowh:17px;position:relative;
+    width:calc(var(--cols)*1ch + 4px);height:calc(var(--rows)*var(--rowh) + 4px);
+    max-width:100%;background:var(--bg);border:2px solid var(--border);
+    font-size:13px;line-height:var(--rowh);overflow:hidden}
+  .term.narrow{--cols:100;--rows:30}
+  .legend{color:var(--muted);font-size:11px;max-width:1160px;line-height:1.6}
+  .legend b{color:var(--text)}
+  .variant{display:none;flex-direction:column;height:100%;position:relative}
+  .variant.on{display:flex}
+  .tbar{text-align:center;padding:1px 0;border-bottom:1px solid var(--border);font-weight:700;flex:none}
+  .tbar .sub{color:var(--muted);font-weight:400}
+  .foot{flex:none;border-top:1px solid var(--border);padding:2px 1ch;display:flex;gap:1.2ch;
+    overflow:hidden;align-items:center;font-size:12px;color:var(--muted);white-space:nowrap}
+  .key{background:#1b2030;color:var(--text);font-weight:700;padding:0 .6ch;cursor:pointer;flex:none}
+  .key.quit{background:var(--guilty);color:#07080d}
+  .flash{flex:none;padding:0 1ch 1px;text-align:right;font-size:12px;color:var(--clean);
+    min-height:var(--rowh);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .flash.err{color:var(--guilty)} .flash.warn{color:var(--count)} .flash.info{color:var(--muted)}
+  .pane{background:var(--panel);border:1px solid var(--border);overflow:hidden;
+    display:flex;flex-direction:column;min-height:0}
+  .pane.focus{border-color:var(--focus);box-shadow:inset 0 0 0 1px var(--focus)}
+  .pane>h3{font-size:11px;color:var(--muted);letter-spacing:.1em;padding:2px 1ch;
+    border-bottom:1px solid var(--border);font-weight:700;display:flex;
+    justify-content:space-between;gap:1ch;white-space:nowrap;overflow:hidden}
+  .scroll{overflow:hidden auto;min-height:0;flex:1}
+  .row{display:flex;gap:1ch;padding:1px 1ch;cursor:pointer;white-space:nowrap;
+    font-size:12.5px;align-items:baseline}
+  .row:hover{background:#151a28}
+  .row.sel{background:var(--hl)}
+  .dot{cursor:pointer;flex:none}
+  .dot.inc{color:var(--guilty)} .dot.exc{color:var(--muted)}
+  .fname{overflow:hidden;text-overflow:ellipsis;flex:1}
+  .row.exc .fname{color:var(--muted);text-decoration:line-through}
+  .cnt{color:var(--count);font-weight:700}
+  .mut{color:var(--muted)} .ok{color:var(--clean)} .bad{color:var(--guilty)} .amber{color:var(--count)}
+  .cyan{color:var(--focus)}
+  .diffbody{padding:3px 1ch;font-size:12.5px;overflow:auto;flex:1}
+  .dl{white-space:pre-wrap}
+  .dmeta{color:var(--muted)} .dneg{color:var(--guilty)} .dpos{color:var(--clean)}
+  .chip{display:inline-block;border:1px solid var(--border);background:#141826;color:var(--muted);
+    padding:0 .8ch;cursor:pointer;font-size:12px;line-height:15px}
+  .chip.on{color:var(--clean);border-color:#3d5a2e;background:#121a12}
+  .chip.warn{color:var(--count);border-color:#5a512e}
+  .btn{display:inline-block;padding:1px 1.5ch;cursor:pointer;font-weight:700;font-size:12.5px;
+    background:#1a1f2e;color:var(--muted);border:1px solid var(--border)}
+  .btn.primary{background:var(--clean);color:#07080d;border-color:var(--clean)}
+  .btn.danger{background:var(--guilty);color:#07080d;border-color:var(--guilty)}
+  .btn.accent{background:var(--accent);color:#07080d;border-color:var(--accent)}
+  .modal{position:absolute;inset:0;background:rgba(4,5,9,.8);display:none;place-items:center;z-index:30}
+  .modal.on{display:grid}
+  .mbox{background:var(--panel);border:2px double var(--accent);padding:10px 2ch;width:78ch;
+    max-width:94%;font-size:12.5px;line-height:1.55}
+  .mbox h4{color:var(--accent);letter-spacing:.1em;font-size:12px;margin-bottom:6px}
+  .mrow{display:flex;gap:2ch;margin-top:8px;justify-content:center}
+  .mnote{color:var(--muted)} .msafe{color:var(--clean)}
+  .drawer{position:absolute;top:calc(var(--rowh) + 2px);right:0;bottom:0;width:48ch;max-width:100%;
+    background:var(--panel);border-left:2px solid var(--focus);display:none;flex-direction:column;z-index:20}
+  .drawer.on{display:flex}
+  .drawer>h3{font-size:11px;color:var(--focus);letter-spacing:.1em;padding:3px 1ch;
+    border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between}
+  .stalebar{display:none;background:#241d0c;color:var(--count);border:1px solid #5a512e;
+    padding:1px 1ch;font-size:12px;flex:none;cursor:pointer}
+  .isstale .stalebar{display:block}
+  .isstale .staledim{opacity:.4}
+  .hbar{height:12px;background:#1a1f2e;border:1px solid var(--border);position:relative;overflow:hidden}
+  .hbar>i{position:absolute;inset:0 66% 0 0;background:linear-gradient(90deg,var(--guilty),#ff8c42)}
+  .hbar>b{position:absolute;inset:0;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--text)}
+  /* variant A */
+  #vA .rail{display:flex;gap:.5ch;padding:2px 1ch;border-bottom:1px solid var(--border);
+    align-items:center;flex:none;font-size:12px;white-space:nowrap;overflow:hidden}
+  #vA .stage{cursor:pointer;color:var(--muted);padding:0 1ch}
+  #vA .stage.cur{background:var(--focus);color:#07080d;font-weight:700}
+  #vA .stage.done{color:var(--clean)}
+  #vA .rsep{color:#3a4258}
+  #vA .abody{flex:1;min-height:0;position:relative;padding:3px;display:flex}
+  #vA .ascreen{display:none;flex:1;min-height:0;gap:3px}
+  #vA .ascreen.on{display:flex}
+  #vA .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;background:var(--panel);border:1px solid var(--focus)}
+  #vA .revwrap{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  #vA .revcols{flex:1;display:flex;gap:3px;min-height:0}
+  #vA .rulestrip{flex:none;padding:2px 1ch;background:var(--panel);border:1px solid var(--border);
+    display:flex;gap:.8ch;flex-wrap:wrap;align-items:center}
+  /* variant B */
+  #vB .bmain{display:flex;flex:1;min-height:0;gap:3px;padding:3px}
+  #vB .bside{width:30ch;flex:none;display:flex;flex-direction:column;gap:3px;overflow:hidden auto}
+  .term.narrow #vB .bside{display:none}
+  #vB .bstrip{display:none;flex:none;width:6ch;flex-direction:column;gap:2px;padding:2px;
+    background:var(--panel);border:1px solid var(--border);font-size:11px;text-align:center}
+  .term.narrow #vB .bstrip{display:flex}
+  #vB .bcenter{flex:1.1;min-width:0;display:flex;flex-direction:column}
+  #vB .bright{flex:1;min-width:0;display:flex;flex-direction:column}
+  #vB .minitabs{display:flex;gap:.5ch}
+  #vB .mtab{cursor:pointer;padding:0 1ch;color:var(--muted)}
+  #vB .mtab.on{background:var(--focus);color:#07080d;font-weight:700}
+  #vB .ledger{flex:none;border-top:1px solid var(--border);padding:1px 1ch;font-size:12px;
+    height:calc(var(--rowh)*3);overflow:hidden}
+  #vB .lrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #vB .armbar{display:none;flex:none;border:2px double var(--accent);background:#1c140b;
+    color:var(--text);padding:2px 1ch;font-size:12.5px}
+  #vB.armed .armbar{display:block}
+  /* variant C */
+  #vC .cscreen{display:none;flex:1;min-height:0;flex-direction:column;gap:3px;padding:3px}
+  #vC .cscreen.on{display:flex}
+  #vC .boardtop{display:flex;gap:3px;flex:none}
+  #vC .casegrid{flex:1;display:grid;grid-template-columns:1.15fr 1fr;gap:3px;min-height:0}
+  .term.narrow #vC .casegrid{grid-template-columns:1fr;grid-template-rows:1.4fr 1fr}
+  #vC .ghead{display:flex;gap:1ch;padding:1px 1ch;background:#141826;cursor:pointer;
+    font-weight:700;font-size:12.5px;align-items:baseline;border-top:1px solid var(--border)}
+  #vC .ghead .cnt{min-width:4ch}
+  #vC .grp.spared .grow{display:none}
+  #vC .grp.spared .ghead{opacity:.55}
+  #vC .grp.folded .grow{display:none}
+  #vC .docket .row{padding:2px 1ch}
+  #vC .tagS{color:var(--guilty)} #vC .tagA{color:var(--clean)} #vC .tagR{color:var(--focus)}
+</style>
+</head>
+<body>
+<header class="chrome">
+  <div class="brand">Bash<span class="struck">—</span>EM
+    <span class="dim">· three UI directions to test · design prototype, 2026-07-17</span></div>
+  <div class="switch">
+    <button class="vbtn on" data-act="variant" data-v="A">A · Pipeline</button>
+    <button class="vbtn" data-act="variant" data-v="B">B · Workbench</button>
+    <button class="vbtn" data-act="variant" data-v="C">C · Case File</button>
+    <span class="gap"></span>
+    <span class="dim">terminal size:</span>
+    <button class="sbtn on" data-act="size" data-s="wide">140×40</button>
+    <button class="sbtn" data-act="size" data-s="narrow">100×30</button>
+  </div>
+  <p class="blurb" id="blurb"></p>
+</header>
+
+<div class="term" id="term">
+
+<!-- ============================= VARIANT A · PIPELINE ============================= -->
+<section class="variant on" id="vA">
+  <div class="tbar">Bash<span class="struck">—</span>EM <span class="sub">· pipeline · <span id="aSub">choose a target</span></span></div>
+  <div class="rail" id="aRail">
+    <span class="stage cur" data-act="a-stage" data-stage="target">1 TARGET</span><span class="rsep">›</span>
+    <span class="stage" data-act="a-stage" data-stage="scan">2 SCAN</span><span class="rsep">›</span>
+    <span class="stage" data-act="a-stage" data-stage="review">3 REVIEW</span><span class="rsep">›</span>
+    <span class="stage" data-act="a-stage" data-stage="receipt">4 RECEIPT</span>
+    <span class="gap" style="flex:1"></span>
+    <span class="chip" data-act="a-open-profile">p profile</span>
+    <span class="chip" data-act="a-open-backups">b vault</span>
+    <span class="mut">~/notes/blog</span>
+  </div>
+  <div class="abody">
+    <!-- stage: target -->
+    <div class="ascreen on" id="aTarget">
+      <div class="pane focus" style="flex:1.25">
+        <h3><span>DIRECTORY · ~/notes/<b class="cyan" id="aCwd">blog</b></span><span>enter descend · backspace up · . hidden</span></h3>
+        <div class="scroll" id="aDirs">
+          <div class="row" data-act="a-descend" data-d="posts"><span class="cyan">▸</span><span class="fname cyan">posts</span></div>
+          <div class="row" data-act="a-descend" data-d="drafts"><span class="cyan">▸</span><span class="fname cyan">drafts</span></div>
+          <div class="row" data-act="a-descend" data-d="src"><span class="cyan">▸</span><span class="fname cyan">src</span></div>
+          <div class="row"><span> </span><span class="fname">README.md</span><span class="mut">[text]</span></div>
+          <div class="row"><span> </span><span class="fname">CHANGELOG.md</span><span class="mut">[text]</span></div>
+          <div class="row"><span class="mut">↪</span><span class="fname mut">shared-notes</span><span class="mut">symlink · not followed</span></div>
+        </div>
+        <div class="foot" style="border-top:1px solid var(--border)">
+          <span class="btn primary" data-act="a-scan-here">s · SCAN THIS FOLDER</span>
+          <span class="mut">nothing is written during a scan</span>
+        </div>
+      </div>
+      <div class="pane" style="flex:1">
+        <h3><span>MISSION BRIEF</span></h3>
+        <div class="diffbody">
+          <div>profile <b class="cyan">typographic</b> <span class="ok">· SAVED</span> <span class="mut">· 7/8 rules on</span></div>
+          <div class="mut">.bash-em.yaml · automatic per root · <span class="chip" data-act="a-open-profile">p edit</span></div>
+          <div style="margin-top:8px">vault <b>~/.bash-em/backups</b> <span class="mut">· 3 runs kept</span> <span class="chip" data-act="a-open-backups">b open</span></div>
+          <div style="margin-top:8px" class="mut">health: not scanned yet — no surprise work at startup</div>
+          <div style="margin-top:14px" class="amber">find the tells. bash them. keep the receipt.</div>
+        </div>
+      </div>
+    </div>
+    <!-- stage: scan -->
+    <div class="ascreen" id="aScan">
+      <div class="center">
+        <div class="cyan" style="font-weight:700">scanning… the em-dashes know.</div>
+        <div class="hbar" style="width:60ch"><i style="inset:0 4% 0 0"></i><b>processing 214 / 223</b></div>
+        <div class="mut">walking ~/notes/blog · 9 skipped (binary/oversize) · esc cancels · nothing written yet</div>
+        <span class="btn" data-act="a-scan-finish">prototype: finish scan →</span>
+      </div>
+    </div>
+    <!-- stage: review -->
+    <div class="ascreen" id="aReview">
+      <div class="revwrap" id="aRevWrap">
+        <div class="mut" style="flex:none;padding:0 1ch"><b class="bad">12</b> dirty files · <b class="ok" id="aInc">12</b> included · 214 scanned · 9 skipped · 480ms</div>
+        <div class="stalebar" data-act="a-rescan">! rules changed — these results are stale · press r (or click here) to rescan</div>
+        <div class="revcols staledim">
+          <div class="pane focus" style="flex:1">
+            <h3><span>OFFENDERS</span><span>space include/exclude</span></h3>
+            <div class="scroll" id="aFileList"></div>
+          </div>
+          <div class="pane" style="flex:1.2">
+            <h3><span>DIFF PREVIEW</span><span>tab focus · j/k scroll</span></h3>
+            <div class="diffbody" id="aDiff"></div>
+          </div>
+        </div>
+        <div class="rulestrip staledim"><span class="mut">rules:</span><span id="aRuleChips"></span>
+          <span class="gap" style="flex:1"></span>
+          <span class="btn accent" data-act="a-open-apply">a · APPLY…</span>
+        </div>
+      </div>
+    </div>
+    <!-- stage: receipt -->
+    <div class="ascreen" id="aReceipt">
+      <div class="center" style="border-color:var(--border)">
+        <div class="ok" style="font-weight:700;font-size:15px">11 files cleaned · 74 tells bashed</div>
+        <div class="pane" style="width:72ch;max-width:96%">
+          <h3><span>RECEIPT · run 5178a3c2</span><span>just now</span></h3>
+          <div class="diffbody">
+            <div>backup sealed <b>before</b> any write · all 11 originals retained</div>
+            <div class="cyan">~/.bash-em/backups/5178a3c2/</div>
+            <div class="mut">root ~/notes/blog · profile typographic · retention: last 10 runs</div>
+            <div style="margin-top:6px"><span class="btn" data-act="a-open-backups">u · restore this run</span>
+              <span class="btn" data-act="a-stage" data-stage="target">enter · new target</span></div>
+          </div>
+        </div>
+        <div class="mut">the dashes may return. you know where to find us.</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot" id="aFoot">
+    <span class="key">enter</span><span>advance</span>
+    <span class="key">esc</span><span>back</span>
+    <span class="key">j k</span><span>move</span>
+    <span class="key">space</span><span>spare/include</span>
+    <span class="key">a</span><span>apply</span>
+    <span class="key">r</span><span>rescan</span>
+    <span class="key">p</span><span>profile</span>
+    <span class="key">b</span><span>vault</span>
+    <span class="chip warn" data-act="a-demo-error">demo: error</span>
+    <span class="gap" style="flex:1"></span><span class="key quit">q</span><span class="bad">quit</span>
+  </div>
+  <div class="flash" id="aFlash">choose a directory, then scan</div>
+
+  <!-- A drawers + modals -->
+  <div class="drawer" id="aProfile">
+    <h3><span>PROFILE · TYPOGRAPHIC <b class="ok" id="aProfState">· SAVED</b></span><span data-act="a-close" style="cursor:pointer">esc ✕</span></h3>
+    <div class="scroll" id="aProfRules"></div>
+    <div class="diffbody" style="flex:none">
+      <div class="mut">fence guard ON · preview 3 lines · max file 10 MiB · .bash-emignore active</div>
+      <div style="margin-top:4px"><span class="btn primary" data-act="a-prof-save">w · save</span>
+        <span class="btn" data-act="a-prof-reload">l · reload</span>
+        <span class="mut"> toggles mark results stale — never auto-applied</span></div>
+    </div>
+  </div>
+  <div class="drawer" id="aBackups">
+    <h3><span>VAULT · ~/.bash-em/backups</span><span data-act="a-close" style="cursor:pointer">esc ✕</span></h3>
+    <div class="scroll" id="aRunList"></div>
+    <div class="diffbody" style="flex:none" id="aRunDetail"></div>
+    <div class="diffbody" style="flex:none"><span class="btn accent" data-act="a-open-restore">r · RESTORE…</span>
+      <span class="mut"> restore point is retained · retention: last 10 runs</span></div>
+  </div>
+  <div class="modal" id="aApply"><div class="mbox">
+    <h4>APPLY · SAFETY MANIFEST</h4>
+    <div><b id="aApplyN">11</b> files · <b>74</b> replacements
+      <span class="mut">— em dash 48 · curly quotes 22 · en dash 6 · zero-width 2 · ellipsis spared (rule off)</span></div>
+    <div class="msafe" style="margin-top:6px">backup first: every original sealed to ~/.bash-em/backups/5178a3c2/ before any write</div>
+    <div class="mnote">writes are atomic · file permissions preserved · q is locked while applying · retention keeps the last 10 runs</div>
+    <div class="mrow"><span class="btn primary" data-act="a-apply-confirm">APPLY 11 FILES</span>
+      <span class="btn" data-act="a-close">CANCEL · esc</span></div>
+  </div></div>
+  <div class="modal" id="aRestore"><div class="mbox">
+    <h4>RESTORE · run <span id="aResId">5178a3c2</span></h4>
+    <div>Put <b id="aResN">11</b> files back exactly as they were, into <b class="cyan" id="aResRoot">~/notes/blog</b>?</div>
+    <div class="mnote">This overwrites the current versions of those files. The restore point is retained afterwards.</div>
+    <div class="mrow"><span class="btn danger" data-act="a-restore-confirm">RESTORE</span>
+      <span class="btn" data-act="a-close">CANCEL · esc</span></div>
+  </div></div>
+</section>
+
+<!-- ============================= VARIANT B · WORKBENCH ============================= -->
+<section class="variant" id="vB">
+  <div class="tbar">Bash<span class="struck">—</span>EM <span class="sub">· workbench · everything on one screen</span></div>
+  <div class="bmain">
+    <div class="bstrip">
+      <span title="target">◎</span><span class="bad" title="health">34%</span>
+      <span class="chip" data-act="b-tab" data-tab="off" title="offenders">O</span>
+      <span class="chip" data-act="b-tab" data-tab="files" title="files">F</span>
+      <span class="chip" data-act="b-tab" data-tab="vault" title="vault">V</span>
+      <span class="mut" title="profile saved">P✓</span>
+    </div>
+    <div class="bside">
+      <div class="pane"><h3><span>TARGET</span></h3>
+        <div class="diffbody" style="flex:none"><div class="cyan">~/notes/blog</div>
+          <div class="mut">214 scanned · 9 skipped</div>
+          <div><span class="chip" data-act="b-tab" data-tab="files">change via Files</span>
+            <span class="chip" data-act="b-rescan">r rescan</span></div></div></div>
+      <div class="pane"><h3><span>HEALTH</span></h3>
+        <div class="diffbody" style="flex:none">
+          <div class="hbar"><i></i><b>34% of files dirty · 87 artifacts</b></div>
+          <div class="mut">directory looking suspicious.</div></div></div>
+      <div class="pane focus"><h3><span>RULES · LIVE</span><span>click / space toggles</span></h3>
+        <div id="bRules"></div></div>
+      <div class="pane"><h3><span>PROFILE</span></h3>
+        <div class="diffbody" style="flex:none"><div>typographic <b class="ok" id="bProfState">· SAVED</b></div>
+          <div><span class="chip" data-act="b-prof-save">w save</span><span class="chip" data-act="b-prof-reload">l reload</span></div></div></div>
+      <div class="pane"><h3><span>VAULT</span></h3>
+        <div class="diffbody" style="flex:none"><div>3 runs · <span class="cyan">~/.bash-em/backups</span></div>
+          <div><span class="chip" data-act="b-tab" data-tab="vault">open ↗</span></div></div></div>
+    </div>
+    <div class="bcenter">
+      <div class="pane focus" style="flex:1">
+        <h3><span class="minitabs">
+            <span class="mtab" data-act="b-tab" data-tab="files">Files</span>
+            <span class="mtab on" data-act="b-tab" data-tab="off">Offenders 12</span>
+            <span class="mtab" data-act="b-tab" data-tab="vault">Vault 3</span></span>
+          <span id="bCenterHint">space include · a apply</span></h3>
+        <div class="stalebar" data-act="b-rescan">! rules changed — offenders are stale · r rescan</div>
+        <div class="armbar" id="bArm">ARMED: bash <b>74</b> tells in <b>11</b> files → backup sealed first to
+          <b class="cyan">~/.bash-em/backups</b> · <span class="btn primary" data-act="b-yes">y confirm</span>
+          <span class="btn" data-act="b-no">n cancel</span></div>
+        <div class="scroll staledim" id="bCenterList"></div>
+        <div class="foot" style="border-top:1px solid var(--border)" id="bCenterFoot">
+          <span class="btn accent" data-act="b-arm">a · APPLY…</span>
+          <span class="mut">nothing is applied without the y confirm</span>
+        </div>
+      </div>
+    </div>
+    <div class="bright">
+      <div class="pane" style="flex:1"><h3><span id="bRightTitle">DIFF · posts/launch-day.md</span><span>j/k scroll</span></h3>
+        <div class="diffbody" id="bRight"></div></div>
+    </div>
+  </div>
+  <div class="ledger" id="bLedger"></div>
+  <div class="foot">
+    <span class="key">tab</span><span>pane</span>
+    <span class="key">j k</span><span>move</span>
+    <span class="key">space</span><span>toggle</span>
+    <span class="key">a</span><span>apply</span>
+    <span class="key">:</span><span class="chip" data-act="b-palette">palette</span>
+    <span class="chip warn" data-act="b-demo-error">demo: error</span>
+    <span class="gap" style="flex:1"></span><span class="key quit">q</span><span class="bad">quit</span>
+  </div>
+  <div class="modal" id="bPal"><div class="mbox" style="border-color:var(--focus)">
+    <h4 style="color:var(--focus)">: COMMAND</h4>
+    <div class="row" data-act="b-cmd" data-cmd="scan"><span class="cyan">scan</span><span class="mut">rescan ~/notes/blog</span></div>
+    <div class="row" data-act="b-cmd" data-cmd="save"><span class="cyan">profile save</span><span class="mut">write .bash-em.yaml</span></div>
+    <div class="row" data-act="b-cmd" data-cmd="restore"><span class="cyan">restore 478500af</span><span class="mut">restore 32 files → ~/blog-old</span></div>
+    <div class="mnote" style="margin-top:6px">esc closes · commands never skip confirmation steps</div>
+  </div></div>
+</section>
+
+<!-- ============================= VARIANT C · CASE FILE ============================= -->
+<section class="variant" id="vC">
+  <div class="tbar">Bash<span class="struck">—</span>EM <span class="sub">· case file · <span id="cSub">case board</span></span></div>
+
+  <!-- board -->
+  <div class="cscreen on" id="cBoard">
+    <div class="boardtop">
+      <div class="pane" style="flex:1.3"><h3><span>TARGET</span><span class="chip" data-act="c-root">t change root</span></h3>
+        <div class="diffbody" style="flex:none"><div class="cyan">~/notes/blog</div>
+          <div class="mut">profile typographic · 7/8 rules · <span class="chip" data-act="c-profile">p profile</span></div></div></div>
+      <div class="pane" style="flex:1"><h3><span>WANTED LEVEL</span></h3>
+        <div class="diffbody" style="flex:none"><div class="hbar"><i></i><b>34% dirty · 87 artifacts at large</b></div>
+          <div class="mut">n opens a new scan case</div></div></div>
+    </div>
+    <div class="pane" id="cRootPick" style="display:none;flex:none"><h3><span>PICK ROOT</span><span data-act="c-root" style="cursor:pointer">esc ✕</span></h3>
+      <div class="row" data-act="c-pickroot"><span class="cyan">▸</span><span class="fname cyan">~/notes/blog</span></div>
+      <div class="row" data-act="c-pickroot"><span class="cyan">▸</span><span class="fname cyan">~/blog-old</span></div>
+      <div class="row" data-act="c-pickroot"><span class="cyan">▸</span><span class="fname cyan">~/Documents/decks</span></div></div>
+    <div class="pane" id="cProfCard" style="display:none;flex:none"><h3><span>PROFILE · TYPOGRAPHIC · SAVED</span><span data-act="c-profile" style="cursor:pointer">esc ✕</span></h3>
+      <div class="diffbody" style="flex:none"><span class="mut">rules are edited in context, inside each case — this card is save/reload only.</span>
+        <span class="chip" data-act="c-flash-save">w save</span><span class="chip">l reload</span></div></div>
+    <div class="pane focus docket" style="flex:1"><h3><span>DOCKET · every scan, seal, and restore in one place</span><span>enter opens</span></h3>
+      <div class="scroll">
+        <div class="row" data-act="c-open-case"><span class="tagS">● OPEN</span><span class="fname">case #12 · scan · just now · <b class="bad">87</b> tells in 12 files</span><span class="mut">review →</span></div>
+        <div class="row" id="cSealedRow" style="display:none" data-act="c-open-receipt"><span class="tagA">✓ SEALED</span><span class="fname">case #12 · apply · just now · 11 files · receipt <b class="amber">5178a3c2</b></span><span class="mut">open →</span></div>
+        <div class="row" data-act="c-open-receipt"><span class="tagA">✓ SEALED</span><span class="fname">case #11 · apply · 3d ago · 32 files · receipt <b class="amber">478500af</b> · ~/blog-old</span><span class="mut">open →</span></div>
+        <div class="row"><span class="tagR">↩ RESTORED</span><span class="fname mut">case #9 · 6d ago · 32 files returned · restore point retained</span></div>
+      </div></div>
+    <div class="foot">
+      <span class="key">enter</span><span>open case</span><span class="key">n</span><span>new scan</span>
+      <span class="key">t</span><span>root</span><span class="key">p</span><span>profile</span>
+      <span class="chip warn" data-act="c-demo-error">demo: error</span>
+      <span class="gap" style="flex:1"></span><span class="key quit">q</span><span class="bad">quit</span></div>
+    <div class="flash" id="cFlash">the docket is the receipt trail — nothing here is hidden in a dotfile you cannot see</div>
+  </div>
+
+  <!-- case (review) -->
+  <div class="cscreen" id="cCase">
+    <div class="mut" style="flex:none;padding:0 1ch">CASE #12 · ~/notes/blog · scanned just now ·
+      <b class="ok" id="cInc">74</b> included of <b class="bad">87</b> · grouped by rule — space spares a whole rule or one file</div>
+    <div class="casegrid">
+      <div class="pane focus"><h3><span>EVIDENCE · BY RULE</span><span>enter fold · space spare</span></h3>
+        <div class="scroll" id="cGroups"></div></div>
+      <div class="pane"><h3><span id="cDiffTitle">EVIDENCE DETAIL</span></h3><div class="diffbody" id="cDiff"></div></div>
+    </div>
+    <div class="foot">
+      <span class="btn accent" data-act="c-bash">a · BASH 74…</span>
+      <span class="key">esc</span><span>board</span><span class="key">j k</span><span>move</span>
+      <span class="key">space</span><span>spare</span>
+      <span class="gap" style="flex:1"></span><span class="key quit">q</span><span class="bad">quit</span></div>
+  </div>
+
+  <!-- receipt view -->
+  <div class="cscreen" id="cReceipt">
+    <div class="pane" style="flex:1"><h3><span>RECEIPT 478500af · case #11 · 3d ago</span><span data-act="c-back" style="cursor:pointer">esc ← board</span></h3>
+      <div class="diffbody">
+        <div>32 originals sealed at <b class="cyan">~/.bash-em/backups/478500af/</b> · root <b>~/blog-old</b> · profile typographic</div>
+        <div class="mut" style="margin:4px 0">manifest: posts/a.md · posts/b.md · notes/c.md · … 29 more · hashes verified on restore</div>
+        <div class="ok">restoring puts these 32 files back exactly as sealed. the receipt is retained.</div>
+        <div style="margin-top:6px"><span class="btn accent" data-act="c-restore">r · RESTORE 32 FILES…</span></div>
+      </div></div>
+    <div class="foot"><span class="key">r</span><span>restore</span><span class="key">esc</span><span>board</span>
+      <span class="gap" style="flex:1"></span><span class="key quit">q</span><span class="bad">quit</span></div>
+  </div>
+
+  <div class="modal" id="cSeal"><div class="mbox">
+    <h4>SEAL RECEIPT · nothing changes until you confirm</h4>
+    <div>case #12 → receipt <b class="amber">5178a3c2</b> · <b>74</b> replacements across <b>11</b> files</div>
+    <div class="msafe" style="margin-top:4px">originals sealed first to ~/.bash-em/backups/5178a3c2/ · restore any time from the docket</div>
+    <div class="mnote">atomic writes · permissions preserved · retention keeps the last 10 receipts · q locked while sealing</div>
+    <div class="mrow"><span class="btn primary" data-act="c-seal-confirm">SEAL &amp; BASH</span>
+      <span class="btn" data-act="c-close">BACK · esc</span></div>
+  </div></div>
+  <div class="modal" id="cRestoreM"><div class="mbox">
+    <h4>RESTORE · receipt 478500af</h4>
+    <div>Overwrite the current versions of <b>32</b> files in <b class="cyan">~/blog-old</b> with the sealed originals?</div>
+    <div class="mnote">The receipt is retained afterwards. Files added since are untouched.</div>
+    <div class="mrow"><span class="btn danger" data-act="c-restore-confirm">RESTORE</span>
+      <span class="btn" data-act="c-close">CANCEL · esc</span></div>
+  </div></div>
+</section>
+</div>
+
+<p class="legend"><b>How to compare:</b> switch variants with the buttons above; toggle 140×40 / 100×30 to see
+responsive behavior (B collapses its sidebar to a glyph strip; C stacks evidence detail; A's drawers go full-width).
+Everything with a border, chip, or key badge is live: in <b>A</b> walk the stage rail (scan → review → apply modal → receipt),
+toggle rules via <b>p</b>, restore via <b>b</b>; in <b>B</b> toggle rules in the sidebar (watch the stale banner + ledger),
+arm apply with <b>a</b> then y/n, open the Vault tab; in <b>C</b> open case #12, spare a rule group or a file, seal the receipt,
+then reopen it from the docket and restore. Keyboard works too: j/k, space, a, r, p, b, esc, and 1/2/3 to switch variants.
+"demo: error" chips show the error channel styling. Confirmation and error copy is deliberately straight; jokes stay in the chrome.</p>
+
+<script>
+(function(){
+  const $=(s,r)=>(r||document).querySelector(s), $$=(s,r)=>[...(r||document).querySelectorAll(s)];
+  const FILES=[["posts/launch-day.md",23],["posts/em-dash-apology.md",17],["drafts/roadmap.md",12],
+    ["README.md",9],["notes/meeting-0702.md",8],["src/copy.ts",7],["docs/guide.md",6],
+    ["posts/old/archive.md",3],["CHANGELOG.md",2]];
+  const RULES=[["em","Em dash",1,"Replace em dashes with a spaced hyphen."],
+    ["en","En dash",1,"Replace en dashes with a plain hyphen."],
+    ["bar","Horizontal bar",1,"Replace horizontal bars with a spaced hyphen."],
+    ["ent","HTML dash entities",1,"Replace encoded dash entities such as &mdash;."],
+    ["cq","Curly quotes",1,"Normalize typographic quotes."],
+    ["ell","Ellipsis",0,"Replace the ellipsis glyph with three dots."],
+    ["zw","Zero-width junk",1,"Remove zero-width and bidi control characters."],
+    ["llm","LLM boilerplate",0,"Flag only in health — never rewritten."]];
+  const RUNS=[["5178a3c2","2m ago",11,"typographic","~/notes/blog"],
+    ["478500af","3d ago",32,"typographic","~/blog-old"],
+    ["07734b48","6d ago",5,"strict","~/notes/blog"]];
+  const HUNKS={
+    "posts/launch-day.md":[[12,"the launch\u2014despite everything\u2014went fine","the launch - despite everything - went fine"],
+      [48,"\u201Csmart\u201D quotes everywhere\u2014naturally","\"smart\" quotes everywhere - naturally"]],
+    "posts/em-dash-apology.md":[[7,"I\u2019m sorry\u2014truly\u2014about the dashes","I'm sorry - truly - about the dashes"],
+      [22,"it won\u2019t happen again\u2026","it won't happen again..."]],
+    "_":[[3,"a line with an em\u2014dash and \u201Cquotes\u201D","a line with an em - dash and \"quotes\""]]};
+  function diffHTML(name){const h=HUNKS[name]||HUNKS._;
+    return '<div class="dmeta" style="margin-bottom:4px">'+name+'</div>'+h.map(x=>
+      '<div class="dl dmeta">L'+x[0]+'</div><div class="dl dneg">\u2212 '+x[1]+
+      '</div><div class="dl dpos">+ '+x[2]+'</div>').join('');}
+  const BLURBS={
+    A:"<b>A \u00b7 Pipeline.</b> The workflow becomes the interface: a stage rail (TARGET \u203a SCAN \u203a REVIEW \u203a RECEIPT) replaces peer tabs. Profile and vault are drawers, apply is a full safety-manifest modal, and rule changes mark results stale in place instead of silently resetting another tab. Cheapest to build on the current Screen enum.",
+    B:"<b>B \u00b7 Workbench.</b> One persistent screen, lazygit-style: a context sidebar with live rule toggles and vault, a swappable center stage, a detail pane, and a 3-line severity ledger instead of a single flash. Apply uses an inline arming pattern (a \u2192 y/n). Densest and most powerful; the 100\u00d730 toggle shows the sidebar collapsing to a glyph strip.",
+    C:"<b>C \u00b7 Case File.</b> Runs are the objects: the board's docket unifies scans, sealed apply receipts, and restores in one visible history \u2014 no hidden vault. Review groups evidence by rule (spare a whole rule or one file), and applying mints a receipt you reopen to restore. Strongest identity and safety mental model; most novel."};
+  const term=$("#term");
+  let A={stage:"target",sel:0,exc:new Set(["drafts/roadmap.md"]),stale:false,run:0,profDirty:false};
+  let B={tab:"off",sel:0,run:0,stale:false,rules:RULES.map(r=>r[2])};
+  let C={sel:"posts/launch-day.md"};
+  function setVariant(v){$$(".vbtn").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+    $$(".variant").forEach(s=>s.classList.toggle("on",s.id==="v"+v));
+    $("#blurb").innerHTML=BLURBS[v];term.dataset.v=v;}
+  function flashA(t,c){const f=$("#aFlash");f.textContent=t;f.className="flash "+(c||"");}
+  function flashC(t,c){const f=$("#cFlash");f.textContent=t;f.className="flash "+(c||"");}
+  /* ---------- A ---------- */
+  const ASTAGES=["target","scan","review","receipt"];
+  function goA(st){A.stage=st;
+    $$("#aRail .stage").forEach(el=>{const i=ASTAGES.indexOf(el.dataset.stage),c=ASTAGES.indexOf(st);
+      el.className="stage"+(el.dataset.stage===st?" cur":i<c?" done":"");});
+    ["Target","Scan","Review","Receipt"].forEach(n=>
+      $("#a"+n).classList.toggle("on",st===n.toLowerCase()));
+    $("#aSub").textContent={target:"choose a target",scan:"scanning\u2026",review:"review targets",receipt:"done"}[st];}
+  function renderAFiles(){const inc=FILES.filter(f=>!A.exc.has(f[0]));
+    $("#aInc").textContent=inc.length;$("#aApplyN").textContent=inc.length;
+    $("#aFileList").innerHTML=FILES.map((f,i)=>{const ex=A.exc.has(f[0]);
+      return '<div class="row'+(i===A.sel?" sel":"")+(ex?" exc":"")+'" data-act="a-file" data-i="'+i+
+      '"><span class="dot '+(ex?"exc":"inc")+'" data-act="a-dot" data-i="'+i+'">'+(ex?"\u25CB":"\u25CF")+
+      '</span><span class="fname">'+f[0]+'</span><span class="cnt">'+f[1]+'</span></div>';}).join("");
+    $("#aDiff").innerHTML=diffHTML(FILES[A.sel][0]);}
+  function renderARules(){$("#aRuleChips").innerHTML=RULES.map((r,i)=>
+      '<span class="chip'+(r[2]?" on":"")+'" data-act="a-rule" data-i="'+i+'">'+r[1]+(r[0]==="llm"?" \u00b7 flag-only":"")+'</span>').join(" ");
+    $("#aProfRules").innerHTML=RULES.map((r,i)=>
+      '<div class="row" data-act="a-rule" data-i="'+i+'"><span class="'+(r[2]?"ok":"mut")+'">'+(r[2]?"\u25CF":"\u25CB")+
+      '</span><span class="fname">'+r[1]+'</span><span class="mut">'+r[3]+'</span></div>').join("");}
+  function renderARuns(){$("#aRunList").innerHTML=RUNS.map((r,i)=>
+      '<div class="row'+(i===A.run?" sel":"")+'" data-act="a-run" data-i="'+i+'"><span class="amber">'+r[0]+
+      '</span><span class="fname">'+r[1]+' \u00b7 '+r[2]+' files</span><span class="mut">'+r[4]+'</span></div>').join("");
+    const r=RUNS[A.run];$("#aRunDetail").innerHTML='restores <b>'+r[2]+'</b> files to <b class="cyan">'+r[4]+
+      '</b><br><span class="mut">profile '+r[3]+' \u00b7 sealed '+r[1]+'</span>';
+    $("#aResId").textContent=r[0];$("#aResN").textContent=r[2];$("#aResRoot").textContent=r[4];}
+  function aCloseAll(){$$("#vA .drawer,#vA .modal").forEach(e=>e.classList.remove("on"));}
+  function setAStale(on){A.stale=on;$("#aRevWrap").classList.toggle("isstale",on);}
+  /* ---------- B ---------- */
+  function renderBRules(){$("#bRules").innerHTML=RULES.map((r,i)=>
+      '<div class="row" data-act="b-rule" data-i="'+i+'"><span class="'+(B.rules[i]?"ok":"mut")+'">'+
+      (B.rules[i]?"\u25CF":"\u25CB")+'</span><span class="fname">'+r[1]+'</span><span class="'+
+      (B.rules[i]?"ok":"mut")+'">'+(B.rules[i]?"ON":"OFF")+'</span></div>').join("");}
+  function renderBCenter(){const pane=$("#bCenterList");
+    $$("#vB .mtab").forEach(t=>t.classList.toggle("on",t.dataset.tab===B.tab));
+    $("#vB .bcenter .pane").classList.toggle("isstale",B.stale&&B.tab==="off");
+    if(B.tab==="off"){pane.innerHTML=FILES.map((f,i)=>
+      '<div class="row'+(i===B.sel?" sel":"")+'" data-act="b-off" data-i="'+i+'"><span class="dot inc">\u25CF</span><span class="fname">'+
+      f[0]+'</span><span class="cnt">'+f[1]+'</span></div>').join("");
+      $("#bRightTitle").textContent="DIFF \u00b7 "+FILES[B.sel][0];$("#bRight").innerHTML=diffHTML(FILES[B.sel][0]);
+      $("#bCenterHint").textContent="space include \u00b7 a apply";}
+    if(B.tab==="files"){pane.innerHTML=['posts/','drafts/','src/','README.md','CHANGELOG.md'].map(n=>
+      '<div class="row"><span class="cyan">'+(n.endsWith("/")?"\u25B8":" ")+'</span><span class="fname'+(n.endsWith("/")?" cyan":"")+'">'+n+'</span></div>').join("");
+      $("#bRightTitle").textContent="INFO";$("#bRight").innerHTML='<span class="mut">enter descends \u00b7 s sets scan root \u00b7 . shows hidden \u00b7 symlinks listed, never followed</span>';
+      $("#bCenterHint").textContent="enter descend \u00b7 s scan here";}
+    if(B.tab==="vault"){pane.innerHTML=RUNS.map((r,i)=>
+      '<div class="row'+(i===B.run?" sel":"")+'" data-act="b-runrow" data-i="'+i+'"><span class="amber">'+r[0]+
+      '</span><span class="fname">'+r[1]+' \u00b7 '+r[2]+' files \u00b7 '+r[3]+'</span><span class="mut">'+r[4]+'</span></div>').join("");
+      const r=RUNS[B.run];
+      $("#bRightTitle").textContent="RESTORE TARGET \u00b7 "+r[0];
+      $("#bRight").innerHTML='restores <b>'+r[2]+'</b> files to <b class="cyan">'+r[4]+'</b><br>'+
+        '<span class="mut">restore point retained \u00b7 retention: last 10 runs</span><br><br>'+
+        '<span class="btn accent" data-act="b-restore-arm">r \u00b7 RESTORE\u2026</span>'+
+        '<span id="bRestoreArm" style="display:none"> <span class="mut">overwrite '+r[2]+' files at '+r[4]+
+        '?</span> <span class="btn danger" data-act="b-restore-yes">y RESTORE</span> <span class="btn" data-act="b-no">n cancel</span></span>';
+      $("#bCenterHint").textContent="enter/r restore";}}
+  function ledger(sym,cls,text){const L=$("#bLedger");
+    L.insertAdjacentHTML("afterbegin",'<div class="lrow"><span class="'+cls+'">'+sym+'</span> '+text+' <span class="mut">\u00b7 just now</span></div>');
+    while(L.children.length>3)L.lastChild.remove();}
+  /* ---------- C ---------- */
+  const CGROUPS=[["EM DASH",48,1,[["posts/launch-day.md",19],["posts/em-dash-apology.md",13],["drafts/roadmap.md",9],["docs/guide.md",4],["src/copy.ts",3]]],
+    ["CURLY QUOTES",22,1,[["posts/em-dash-apology.md",8],["README.md",7],["notes/meeting-0702.md",7]]],
+    ["EN DASH",6,1,[["CHANGELOG.md",4],["docs/guide.md",2]]],
+    ["ZERO-WIDTH JUNK",2,1,[["src/copy.ts",2]]],
+    ["ELLIPSIS",9,0,[["posts/old/archive.md",9]]]];
+  function renderCGroups(){$("#cGroups").innerHTML=CGROUPS.map((g,gi)=>
+    '<div class="grp'+(g[2]?"":" spared")+'" id="cg'+gi+'">'+
+    '<div class="ghead" data-act="c-fold" data-g="'+gi+'"><span class="'+(g[2]?"bad":"mut")+'">\u25BE</span>'+
+    '<span class="fname">'+g[0]+'</span><span class="cnt">\u00d7'+g[1]+'</span>'+
+    '<span class="chip'+(g[2]?" on":"")+'" data-act="c-spare" data-g="'+gi+'">'+(g[2]?"ON \u00b7 space spares all":"SPARED")+'</span></div>'+
+    g[3].map(f=>'<div class="grow row" data-act="c-file" data-f="'+f[0]+'"><span class="dot inc">\u25CF</span><span class="fname">'+
+      f[0]+'</span><span class="cnt">'+f[1]+'</span></div>').join("")+'</div>').join("");
+    const inc=CGROUPS.filter(g=>g[2]).reduce((s,g)=>s+g[1],0);$("#cInc").textContent=inc;
+    $("#cDiffTitle").textContent="EVIDENCE DETAIL \u00b7 "+C.sel;$("#cDiff").innerHTML=diffHTML(C.sel);}
+  function goC(sc){["Board","Case","Receipt"].forEach(n=>$("#c"+n).classList.toggle("on",sc===n.toLowerCase()));
+    $("#cSub").textContent={board:"case board",case:"case #12 \u00b7 review",receipt:"receipt 478500af"}[sc];}
+  /* ---------- dispatch ---------- */
+  document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el)return;
+    const act=el.dataset.act,i=+el.dataset.i||0;
+    switch(act){
+    case "variant":setVariant(el.dataset.v);break;
+    case "size":$$(".sbtn").forEach(b=>b.classList.toggle("on",b===el));
+      term.classList.toggle("narrow",el.dataset.s==="narrow");break;
+    /* A */
+    case "a-stage":aCloseAll();goA(el.dataset.stage);break;
+    case "a-descend":$("#aCwd").textContent=el.dataset.d;flashA("descended into "+el.dataset.d+" \u00b7 backspace goes up","info");break;
+    case "a-scan-here":goA("scan");flashA("scanning\u2026 nothing is written during a scan","warn");break;
+    case "a-scan-finish":goA("review");setAStale(false);renderAFiles();
+      flashA("87 offenders in 12 files. space to spare them. a to bash.","err");break;
+    case "a-file":A.sel=i;renderAFiles();break;
+    case "a-dot":e.stopPropagation();{const f=FILES[i][0];A.exc.has(f)?A.exc.delete(f):A.exc.add(f);renderAFiles();}break;
+    case "a-rule":RULES[i][2]=RULES[i][2]?0:1;A.profDirty=true;renderARules();setAStale(true);
+      $("#aProfState").textContent="\u00b7 UNSAVED";$("#aProfState").className="amber";
+      flashA(RULES[i][1]+(RULES[i][2]?" enabled":" disabled")+" \u00b7 w saves \u00b7 results stale until rescan","warn");break;
+    case "a-rescan":setAStale(false);flashA("rescanned \u00b7 74 offenders with current rules","");break;
+    case "a-prof-save":A.profDirty=false;$("#aProfState").textContent="\u00b7 SAVED";$("#aProfState").className="ok";
+      flashA("profile saved to ~/notes/blog/.bash-em.yaml","");break;
+    case "a-prof-reload":flashA("profile reloaded from disk \u00b7 results stale until rescan","warn");setAStale(true);break;
+    case "a-open-profile":aCloseAll();$("#aProfile").classList.add("on");break;
+    case "a-open-backups":aCloseAll();renderARuns();$("#aBackups").classList.add("on");break;
+    case "a-run":A.run=i;renderARuns();break;
+    case "a-open-apply":if(A.stale){flashA("results are stale \u2014 rescan (r) before applying","err");break;}
+      $("#aApply").classList.add("on");break;
+    case "a-apply-confirm":aCloseAll();goA("receipt");
+      flashA("11 files cleaned \u00b7 backup 5178a3c2 retained in ~/.bash-em/backups","");break;
+    case "a-open-restore":$("#aRestore").classList.add("on");break;
+    case "a-restore-confirm":aCloseAll();
+      flashA("restored "+RUNS[A.run][2]+" files \u00b7 restore point retained","");break;
+    case "a-close":aCloseAll();break;
+    case "a-demo-error":flashA("restore error: permission denied: posts/launch-day.md \u2014 nothing was changed","err");break;
+    /* B */
+    case "b-tab":B.tab=el.dataset.tab;renderBCenter();break;
+    case "b-off":B.sel=i;renderBCenter();break;
+    case "b-runrow":B.run=i;renderBCenter();break;
+    case "b-rule":B.rules[i]=B.rules[i]?0:1;B.stale=true;renderBRules();renderBCenter();
+      ledger("!","amber",RULES[i][1]+(B.rules[i]?" enabled":" disabled")+" \u00b7 offenders stale \u00b7 r rescans");break;
+    case "b-rescan":B.stale=false;renderBCenter();ledger("\u2713","ok","rescan finished \u00b7 74 offenders with current rules");break;
+    case "b-arm":$("#vB").classList.add("armed");break;
+    case "b-yes":$("#vB").classList.remove("armed");
+      ledger("\u2713","ok","11 files cleaned \u00b7 backup 5178a3c2 retained (~/.bash-em/backups)");break;
+    case "b-no":$("#vB").classList.remove("armed");const ra=$("#bRestoreArm");if(ra)ra.style.display="none";
+      ledger("\u00b7","mut","cancelled \u00b7 nothing was changed");break;
+    case "b-restore-arm":{const ra2=$("#bRestoreArm");if(ra2)ra2.style.display="inline";}break;
+    case "b-restore-yes":renderBCenter();
+      ledger("\u2713","ok","restored "+RUNS[B.run][2]+" files to "+RUNS[B.run][4]+" \u00b7 restore point retained");break;
+    case "b-palette":$("#bPal").classList.add("on");break;
+    case "b-cmd":$("#bPal").classList.remove("on");
+      if(el.dataset.cmd==="scan")ledger("\u2713","ok","rescan finished \u00b7 87 offenders in 12 files");
+      if(el.dataset.cmd==="save")ledger("\u2713","ok","profile saved to .bash-em.yaml");
+      if(el.dataset.cmd==="restore")ledger("!","amber","restore 478500af needs the y confirm in the detail pane \u2192 Vault");
+      if(el.dataset.cmd==="restore"){B.tab="vault";B.run=1;renderBCenter();}break;
+    case "b-demo-error":ledger("\u2715","bad","apply error: permission denied: src/copy.ts \u2014 backup intact, no partial write");break;
+    /* C */
+    case "c-open-case":goC("case");renderCGroups();break;
+    case "c-open-receipt":goC("receipt");break;
+    case "c-back":goC("board");break;
+    case "c-fold":$("#cg"+el.dataset.g).classList.toggle("folded");break;
+    case "c-spare":e.stopPropagation();{const g=CGROUPS[+el.dataset.g];g[2]=g[2]?0:1;renderCGroups();
+      }break;
+    case "c-file":C.sel=el.dataset.f;renderCGroups();break;
+    case "c-bash":$("#cSeal").classList.add("on");break;
+    case "c-seal-confirm":$("#cSeal").classList.remove("on");$("#cSealedRow").style.display="flex";goC("board");
+      flashC("sealed \u00b7 11 files cleaned \u00b7 receipt 5178a3c2 on the docket","");break;
+    case "c-restore":$("#cRestoreM").classList.add("on");break;
+    case "c-restore-confirm":$("#cRestoreM").classList.remove("on");goC("board");
+      flashC("restored 32 files to ~/blog-old \u00b7 receipt retained","");break;
+    case "c-close":$$("#vC .modal").forEach(m=>m.classList.remove("on"));break;
+    case "c-root":{const p=$("#cRootPick");p.style.display=p.style.display==="none"?"flex":"none";}break;
+    case "c-pickroot":$("#cRootPick").style.display="none";flashC("root set \u00b7 n starts a scan case here","");break;
+    case "c-profile":{const p=$("#cProfCard");p.style.display=p.style.display==="none"?"flex":"none";}break;
+    case "c-flash-save":flashC("profile saved to .bash-em.yaml","");break;
+    case "c-demo-error":flashC("restore error: ~/blog-old is missing \u2014 nothing was changed \u00b7 receipt intact","err");break;
+    }});
+  document.addEventListener("keydown",e=>{const v=term.dataset.v||"A";const k=e.key;
+    if(k==="1"||k==="2"||k==="3"){setVariant({1:"A",2:"B",3:"C"}[k]);return;}
+    if(k==="Escape"){aCloseAll();$$(".modal").forEach(m=>m.classList.remove("on"));
+      $("#vB").classList.remove("armed");
+      if(v==="A"&&A.stage!=="target")goA(ASTAGES[Math.max(0,ASTAGES.indexOf(A.stage)-1)]);
+      if(v==="C"&&!$("#cBoard").classList.contains("on"))goC("board");return;}
+    if(v==="A"){
+      if(k==="j"||k==="k"){A.sel=(A.sel+(k==="j"?1:FILES.length-1))%FILES.length;renderAFiles();}
+      if(k===" "){e.preventDefault();const f=FILES[A.sel][0];A.exc.has(f)?A.exc.delete(f):A.exc.add(f);renderAFiles();}
+      if(k==="a"&&A.stage==="review")document.querySelector('[data-act="a-open-apply"]').click();
+      if(k==="r")setAStale(false),flashA("rescanned \u00b7 results reflect current rules","");
+      if(k==="p")$("#aProfile").classList.toggle("on");
+      if(k==="b"){renderARuns();$("#aBackups").classList.toggle("on");}
+      if(k==="Enter"&&A.stage==="target")goA("scan");}
+    if(v==="B"){
+      if(k==="a")$("#vB").classList.add("armed");
+      if(k==="y"&&$("#vB").classList.contains("armed"))document.querySelector('[data-act="b-yes"]').click();
+      if(k==="n")document.querySelector('[data-act="b-no"]').click();
+      if(k===":")$("#bPal").classList.add("on");}
+    if(v==="C"){
+      if(k==="a"&&$("#cCase").classList.contains("on"))$("#cSeal").classList.add("on");
+      if(k==="n")flashC("new scan case opened \u00b7 scanning\u2026","warn");}});
+  /* init */
+  setVariant("A");renderAFiles();renderARules();renderARuns();
+  renderBRules();renderBCenter();
+  ledger("\u2713","ok","scan finished \u00b7 87 offenders in 12 files (480ms)");
+  renderCGroups();
+  A.exc.delete("drafts/roadmap.md");A.exc.add("drafts/roadmap.md");renderAFiles();
+})();
+</script>
+</body>
+</html>
